@@ -1,6 +1,8 @@
 import os
+from enum import Enum
 import uuid
 import math
+
 import requests
 
 
@@ -21,8 +23,10 @@ class Resumable(object):
 
     def upload(self):
         for file in self.files:
-            for chunk in file.chunks:
+            chunk = file.next_queued_chunk()
+            while chunk:
                 chunk.send(self.target, self.headers)
+                chunk = file.next_queued_chunk()
 
 
 class ResumableFile(object):
@@ -56,12 +60,24 @@ class ResumableFile(object):
         self._fp.seek(start)
         return self._fp.read(size)
 
+    def next_queued_chunk(self):
+        for chunk in self.chunks:
+            if chunk.state == ResumableChunkState.QUEUED:
+                return chunk
+
+
+class ResumableChunkState(Enum):
+    QUEUED = 0
+    UPLOADING = 1
+    DONE = 2
+
 
 class ResumableChunk(object):
 
     def __init__(self, file, chunk_index):
         self.file = file
         self.chunk_index = chunk_index
+        self.state = ResumableChunkState.QUEUED
 
     @property
     def start(self):
@@ -71,6 +87,8 @@ class ResumableChunk(object):
         return self.file.load_bytes(self.start, self.file.chunk_size)
 
     def send(self, target, headers=None):
+
+        self.state = ResumableChunkState.UPLOADING
 
         chunk_data = self.load()
 
@@ -89,3 +107,5 @@ class ResumableChunk(object):
         response = requests.post(target, headers=headers, data=query,
                                  files={'file': chunk_data})
         response.raise_for_status()
+
+        self.state = ResumableChunkState.DONE
