@@ -1,5 +1,6 @@
 import os
 import uuid
+import math
 import requests
 
 
@@ -8,12 +9,20 @@ MB = 1024 * 1024
 
 class Resumable(object):
 
-    def __init__(self, target, chunk_size=MB, file_parameter_name='file',
-                 headers=None):
+    def __init__(self, target, chunk_size=MB, headers=None):
         self.target = target
         self.chunk_size = chunk_size
-        self.file_parameter_name = file_parameter_name
-        self.headers = headers or {}
+        self.headers = headers
+
+        self.files = []
+
+    def add_file(self, path):
+        self.files.append(ResumableFile(path, self.chunk_size))
+
+    def upload(self):
+        for file in self.files:
+            for chunk in file.chunks:
+                chunk.send(self.target, self.headers)
 
 
 class ResumableFile(object):
@@ -25,6 +34,9 @@ class ResumableFile(object):
         self.size = os.path.getsize(path)
         self._fp = open(path, 'rb')
         self.unique_identifier = uuid.uuid4()
+
+        n_chunks = math.ceil(self.size / float(self.chunk_size))
+        self.chunks = [ResumableChunk(self, i) for i in range(n_chunks)]
 
     @property
     def name(self):
@@ -39,7 +51,7 @@ class ResumableFile(object):
     def __exit__(self, *args):
         self.close()
 
-    def load_slice(self, start, size):
+    def load_bytes(self, start, size):
         # TODO: Lock when async
         self._fp.seek(start)
         return self._fp.read(size)
@@ -47,7 +59,7 @@ class ResumableFile(object):
 
 class ResumableChunk(object):
 
-    def __init__(self, file, chunk_index, chunk_size):
+    def __init__(self, file, chunk_index):
         self.file = file
         self.chunk_index = chunk_index
 
@@ -58,22 +70,22 @@ class ResumableChunk(object):
     def load(self):
         return self.file.load_bytes(self.start, self.file.chunk_size)
 
-    def send(self, target):
-        data = self.load()
+    def send(self, target, headers=None):
+
+        chunk_data = self.load()
+
         query = {
-            'chunkNumberParameterName': self.chunk_index + 1,
-            'chunkSizeParameterName': self.file.chunk_size,
-            'currentChunkSizeParameterName': len(data),
-            'totalSizeParameterName': self.file.size,
-            #'typeParameterName': '', TODO: guess mime type?
-            'identifierParameterName': str(self.file.unique_identifier),
-            'fileNameParameterName': self.file.name,
-            'relativePathParameterName': self.file.path,
-            'totalChunksParameterName': 0  #TODO: number of chunks
+            'resumableChunkNumber': self.chunk_index + 1,
+            'resumableChunkSize': self.file.chunk_size,
+            'resumableCurrentChunkSize': len(chunk_data),
+            'resumableTotalSize': self.file.size,
+            #'resumableType': '', TODO: guess mime type?
+            'resumableIdentifier': str(self.file.unique_identifier),
+            'resumableFileName': self.file.name,
+            'resumableRelativePath': self.file.path,
+            'resumableTotalChunks': len(self.file.chunks)
         }
-        response = requests.post(
-            target,
-            data=query,
-            files={self.file.name: data}
-        )
+
+        response = requests.post(target, headers=headers, data=query,
+                                 files={'file': chunk_data})
         response.raise_for_status()
