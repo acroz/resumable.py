@@ -21,6 +21,10 @@ class Resumable(object):
     def add_file(self, path):
         self.files.append(ResumableFile(path, self.chunk_size))
 
+    def close(self):
+        for file in self.files:
+            file.close()
+
     def upload(self):
         for file in self.files:
             chunk = file.next_queued_chunk()
