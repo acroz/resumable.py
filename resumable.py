@@ -2,6 +2,9 @@ import os
 from enum import Enum
 import uuid
 import math
+from collections import defaultdict
+from threading import Thread, Lock
+import time
 
 import requests
 
@@ -9,28 +12,99 @@ import requests
 MB = 1024 * 1024
 
 
+class ResumableSignal(Enum):
+    FILE_ADDED = 0
+
+
+NEXT_TASK_LOCK = Lock()
+
+
+class ResumableWorkerPool(object):
+
+    def __init__(self, num_workers, get_task):
+        self.workers = [ResumableWorker(get_task) for _ in range(num_workers)]
+        for worker in self.workers:
+            worker.start()
+
+    def join(self):
+        for worker in self.workers:
+            worker.poll = False
+        for worker in self.workers:
+            worker.join()
+
+
+class ResumableWorker(Thread):
+
+    def __init__(self, get_task, poll=True):
+        super(ResumableWorker, self).__init__()
+        self.get_task = get_task
+        self.poll = poll
+
+    def run(self):
+        while True:
+            with NEXT_TASK_LOCK:
+                task = self.get_task()
+            while task:
+                task()
+                with NEXT_TASK_LOCK:
+                    task = self.get_task()
+            if self.poll:
+                time.sleep(0.1)
+            else:
+                break
+
+
 class Resumable(object):
 
-    def __init__(self, target, chunk_size=MB, headers=None):
+    def __init__(self, target, simultaneous_uploads=3, chunk_size=MB,
+                 headers=None):
         self.target = target
         self.chunk_size = chunk_size
         self.headers = headers
 
         self.files = []
+        self.signal_callbacks = defaultdict(list)
+
+        self.worker_pool = ResumableWorkerPool(simultaneous_uploads,
+                                               self.next_task)
 
     def add_file(self, path):
         self.files.append(ResumableFile(path, self.chunk_size))
+        self._send_signal(ResumableSignal.FILE_ADDED)
+
+    def register_callback(self, signal, callback):
+        self.signal_callbacks[signal].append(callback)
+
+    def _send_signal(self, signal):
+        for callback in self.signal_callbacks[signal]:
+            callback()
+
+    def wait_until_complete(self):
+        self.worker_pool.join()
 
     def close(self):
         for file in self.files:
             file.close()
 
-    def upload(self):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.wait_until_complete()
+        self.close()
+
+    @property
+    def queued_chunks(self):
         for file in self.files:
-            chunk = file.next_queued_chunk()
-            while chunk:
-                chunk.send(self.target, self.headers)
-                chunk = file.next_queued_chunk()
+            yield from file.queued_chunks
+
+    def next_task(self):
+        try:
+            next_chunk = next(self.queued_chunks)
+        except StopIteration:
+            return None
+        else:
+            return lambda: next_chunk.send(self.target, self.headers)
 
 
 class ResumableFile(object):
@@ -58,10 +132,11 @@ class ResumableFile(object):
         self._fp.seek(start)
         return self._fp.read(size)
 
-    def next_queued_chunk(self):
+    @property
+    def queued_chunks(self):
         for chunk in self.chunks:
             if chunk.state == ResumableChunkState.QUEUED:
-                return chunk
+                yield chunk
 
 
 class ResumableChunkState(Enum):
