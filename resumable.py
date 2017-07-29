@@ -53,12 +53,6 @@ class ResumableFile(object):
     def close(self):
         self._fp.close()
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        self.close()
-
     def load_bytes(self, start, size):
         # TODO: Lock when async
         self._fp.seek(start)
