@@ -13,7 +13,9 @@ MB = 1024 * 1024
 
 
 class ResumableSignal(Enum):
-    FILE_ADDED = 0
+    CHUNK_COMPLETED = 0
+    FILE_ADDED = 1
+    FILE_COMPLETED = 2
 
 
 NEXT_TASK_LOCK = Lock()
@@ -69,15 +71,16 @@ class Resumable(object):
                                                self.next_task)
 
     def add_file(self, path):
-        self.files.append(ResumableFile(path, self.chunk_size))
-        self._send_signal(ResumableSignal.FILE_ADDED)
+        file = ResumableFile(path, self.chunk_size)
+        self.files.append(file)
+        self.send_signal(ResumableSignal.FILE_ADDED, file)
 
     def register_callback(self, signal, callback):
         self.signal_callbacks[signal].append(callback)
 
-    def _send_signal(self, signal):
+    def send_signal(self, signal, *args):
         for callback in self.signal_callbacks[signal]:
-            callback()
+            callback(*args)
 
     def wait_until_complete(self):
         self.worker_pool.join()
