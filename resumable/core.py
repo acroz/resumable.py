@@ -2,6 +2,7 @@ import os
 from enum import Enum
 import uuid
 from collections import defaultdict
+import mimetypes
 
 import requests
 
@@ -103,11 +104,23 @@ class ResumableFile(CallbackMixin):
         self.file.close()
 
     @property
+    def type(self):
+        """Mimic the type parameter of a JS File object.
+
+        Resumable.js uses the File object's type attribute to guess mime type,
+        which is guessed from file extention accoring to
+        https://developer.mozilla.org/en-US/docs/Web/API/File/type.
+        """
+        type_, _ = mimetypes.guess_type(self.file.path)
+        # When no type can be inferred, File.type returns an empty string
+        return '' if type_ is None else type_
+
+    @property
     def query(self):
         return {
             'resumableChunkSize': self.file.chunk_size,
             'resumableTotalSize': self.file.size,
-            # 'resumableType': '', TODO: guess mime type?
+            'resumableType': self.type,
             'resumableIdentifier': str(self.unique_identifier),
             'resumableFileName': os.path.basename(self.file.path),
             'resumableRelativePath': self.file.path,
