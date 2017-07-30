@@ -1,12 +1,11 @@
 import os
 from enum import Enum
 import uuid
-import math
 from collections import defaultdict
-from threading import Lock
 
 import requests
 
+from resumable.file import LazyLoadChunkableFile
 from resumable.worker import ResumableWorkerPool
 
 
@@ -87,32 +86,33 @@ class Resumable(CallbackMixin):
 class ResumableFile(CallbackMixin):
 
     def __init__(self, path, chunk_size):
-        self.path = path
-        self.chunk_size = chunk_size
+        super(ResumableFile, self).__init__()
 
-        self.size = os.path.getsize(path)
-        self._fp = open(path, 'rb')
-        self._fp_lock = Lock()
+        self.file = LazyLoadChunkableFile(path, chunk_size)
         self.unique_identifier = uuid.uuid4()
 
-        n_chunks = math.ceil(self.size / float(self.chunk_size))
-        self.chunks = [ResumableChunk(self, i) for i in range(n_chunks)]
+        self.chunks = [ResumableChunk(self, chunk)
+                       for chunk in self.file.chunks]
+
         for chunk in self.chunks:
             chunk.proxy_signals_to(self)
-            chunk.register_callback(ResumableChunk.CHUNK_COMPLETED,
+            chunk.register_callback(ResumableSignal.CHUNK_COMPLETED,
                                     self.handle_chunk_completion)
 
-    @property
-    def name(self):
-        return os.path.basename(self.path)
-
     def close(self):
-        self._fp.close()
+        self.file.close()
 
-    def load_bytes(self, start, size):
-        with self._fp_lock:
-            self._fp.seek(start)
-            return self._fp.read(size)
+    @property
+    def query(self):
+        return {
+            'resumableChunkSize': self.file.chunk_size,
+            'resumableTotalSize': self.file.size,
+            # 'resumableType': '', TODO: guess mime type?
+            'resumableIdentifier': str(self.unique_identifier),
+            'resumableFileName': os.path.basename(self.file.path),
+            'resumableRelativePath': self.file.path,
+            'resumableTotalChunks': len(self.chunks)
+        }
 
     @property
     def completed(self):
@@ -124,8 +124,8 @@ class ResumableFile(CallbackMixin):
 
     def handle_chunk_completion(self):
         if self.completed:
-            self.send_signal(ResumableSignal.FILE_COMPLETED, self)
-            self.close()
+            self.send_signal(ResumableSignal.FILE_COMPLETED)
+            self.file.close()
 
 
 class ResumableChunkState(Enum):
@@ -137,48 +137,34 @@ class ResumableChunkState(Enum):
 
 class ResumableChunk(CallbackMixin):
 
-    def __init__(self, file, chunk_index):
+    def __init__(self, file, chunk):
+        super(ResumableChunk, self).__init__()
         self.file = file
-        self.chunk_index = chunk_index
+        self.chunk = chunk
         self.state = ResumableChunkState.QUEUED
 
     @property
-    def start(self):
-        return self.chunk_index * self.file.chunk_size
-
-    def load(self):
-        return self.file.load_bytes(self.start, self.file.chunk_size)
-
-    def _query(self, chunk_data):
-        return {
-            'resumableChunkNumber': self.chunk_index + 1,
-            'resumableChunkSize': self.file.chunk_size,
-            'resumableCurrentChunkSize': len(chunk_data),
-            'resumableTotalSize': self.file.size,
-            # 'resumableType': '', TODO: guess mime type?
-            'resumableIdentifier': str(self.file.unique_identifier),
-            'resumableFileName': self.file.name,
-            'resumableRelativePath': self.file.path,
-            'resumableTotalChunks': len(self.file.chunks)
+    def query(self):
+        query = {
+            'resumableChunkNumber': self.chunk.index + 1,
+            'resumableCurrentChunkSize': self.chunk.size
         }
+        query.update(self.file.query)
+        return query
 
     def test(self, target, headers=None):
-        chunk_data = self.load()
-        response = requests.get(target, headers=headers,
-                                data=self._query(chunk_data))
+        response = requests.get(target, headers=headers, data=self.query)
         if response.status_code == 200:
             self.state = ResumableChunkState.DONE
-            self.send_signal(ResumableSignal.CHUNK_COMPLETED, self)
+            self.send_signal(ResumableSignal.CHUNK_COMPLETED)
 
     def send(self, target, headers=None):
         self.state = ResumableChunkState.UPLOADING
-        chunk_data = self.load()
-        response = requests.post(target, headers=headers,
-                                 data=self._query(chunk_data),
-                                 files={'file': chunk_data})
+        response = requests.post(target, headers=headers, data=self.query,
+                                 files={'file': self.chunk.data})
         response.raise_for_status()
         self.state = ResumableChunkState.DONE
-        self.send_signal(ResumableSignal.CHUNK_COMPLETED, self)
+        self.send_signal(ResumableSignal.CHUNK_COMPLETED)
 
     def create_task(self, target, headers=None):
         def task():
