@@ -8,18 +8,14 @@ import time
 
 import requests
 
-
 MB = 1024 * 1024
-
 
 class ResumableSignal(Enum):
     CHUNK_COMPLETED = 0
     FILE_ADDED = 1
     FILE_COMPLETED = 2
 
-
 NEXT_TASK_LOCK = Lock()
-
 
 class ResumableWorkerPool(object):
 
@@ -33,7 +29,6 @@ class ResumableWorkerPool(object):
             worker.poll = False
         for worker in self.workers:
             worker.join()
-
 
 class ResumableWorker(Thread):
 
@@ -54,7 +49,6 @@ class ResumableWorker(Thread):
                 time.sleep(0.1)
             else:
                 break
-
 
 class Resumable(object):
 
@@ -97,18 +91,20 @@ class Resumable(object):
         self.close()
 
     @property
-    def queued_chunks(self):
+    def chunks(self):
         for file in self.files:
-            yield from file.queued_chunks
+            yield from file.chunks
 
     def next_task(self):
-        try:
-            next_chunk = next(self.queued_chunks)
-        except StopIteration:
-            return None
-        else:
-            return lambda: next_chunk.send(self.target, self.headers)
-
+        for chunk in self.chunks:
+            if chunk.state == ResumableChunkState.QUEUED:
+                def completion_callback():
+                    self.send_signal(ResumableSignal.CHUNK_COMPLETED, chunk)
+                    if chunk.file.completed:
+                        self.send_signal(ResumableSignal.FILE_COMPLETED,
+                                         chunk.file)
+                return chunk.create_task(self.target, self.headers,
+                                         completion_callback)
 
 class ResumableFile(object):
 
@@ -136,17 +132,19 @@ class ResumableFile(object):
         return self._fp.read(size)
 
     @property
-    def queued_chunks(self):
+    def completed(self):
         for chunk in self.chunks:
-            if chunk.state == ResumableChunkState.QUEUED:
-                yield chunk
+            if chunk.state != ResumableChunkState.DONE:
+                return False
+        else:
+            return True
 
 
 class ResumableChunkState(Enum):
     QUEUED = 0
-    UPLOADING = 1
-    DONE = 2
-
+    POPPED = 1
+    UPLOADING = 2
+    DONE = 3
 
 class ResumableChunk(object):
 
@@ -162,13 +160,8 @@ class ResumableChunk(object):
     def load(self):
         return self.file.load_bytes(self.start, self.file.chunk_size)
 
-    def send(self, target, headers=None):
-
-        self.state = ResumableChunkState.UPLOADING
-
-        chunk_data = self.load()
-
-        query = {
+    def _query(self, chunk_data):
+        return {
             'resumableChunkNumber': self.chunk_index + 1,
             'resumableChunkSize': self.file.chunk_size,
             'resumableCurrentChunkSize': len(chunk_data),
@@ -180,8 +173,28 @@ class ResumableChunk(object):
             'resumableTotalChunks': len(self.file.chunks)
         }
 
-        response = requests.post(target, headers=headers, data=query,
+    def test(self, target, headers=None):
+        chunk_data = self.load()
+        response = requests.get(target, headers=headers,
+                                data=self._query(chunk_data))
+        if response.status_code == 200:
+            self.state = ResumableChunkState.DONE
+
+    def send(self, target, headers=None):
+        self.state = ResumableChunkState.UPLOADING
+        chunk_data = self.load()
+        response = requests.post(target, headers=headers,
+                                 data=self._query(chunk_data),
                                  files={'file': chunk_data})
         response.raise_for_status()
-
         self.state = ResumableChunkState.DONE
+
+    def create_task(self, target, headers=None, completion_callback=None):
+        def task():
+            self.test(target, headers)
+            if self.state != ResumableChunkState.DONE:
+                self.send(target, headers)
+            if completion_callback is not None:
+                completion_callback()
+        self.state = ResumableChunkState.POPPED
+        return task
