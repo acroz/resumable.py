@@ -50,16 +50,31 @@ class ResumableWorker(Thread):
             else:
                 break
 
-class Resumable(object):
+
+class CallbackMixin(object):
+
+    def __init__(self, *args, **kwargs):
+        super(CallbackMixin, self).__init__(*args, **kwargs)
+        self.signal_callbacks = defaultdict(list)
+
+    def register_callback(self, signal, callback):
+        self.signal_callbacks[signal].append(callback)
+
+    def send_signal(self, signal, *args):
+        for callback in self.signal_callbacks[signal]:
+            callback(*args)
+
+
+class Resumable(CallbackMixin):
 
     def __init__(self, target, simultaneous_uploads=3, chunk_size=MB,
                  headers=None):
+        super(Resumable, self).__init__()
         self.target = target
         self.chunk_size = chunk_size
         self.headers = headers
 
         self.files = []
-        self.signal_callbacks = defaultdict(list)
 
         self.worker_pool = ResumableWorkerPool(simultaneous_uploads,
                                                self.next_task)
@@ -68,13 +83,6 @@ class Resumable(object):
         file = ResumableFile(path, self.chunk_size)
         self.files.append(file)
         self.send_signal(ResumableSignal.FILE_ADDED, file)
-
-    def register_callback(self, signal, callback):
-        self.signal_callbacks[signal].append(callback)
-
-    def send_signal(self, signal, *args):
-        for callback in self.signal_callbacks[signal]:
-            callback(*args)
 
     def wait_until_complete(self):
         self.worker_pool.join()
