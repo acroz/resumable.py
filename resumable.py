@@ -10,12 +10,15 @@ import requests
 
 MB = 1024 * 1024
 
+
 class ResumableSignal(Enum):
     CHUNK_COMPLETED = 0
     FILE_ADDED = 1
     FILE_COMPLETED = 2
 
+
 NEXT_TASK_LOCK = Lock()
+
 
 class ResumableWorkerPool(object):
 
@@ -29,6 +32,7 @@ class ResumableWorkerPool(object):
             worker.poll = False
         for worker in self.workers:
             worker.join()
+
 
 class ResumableWorker(Thread):
 
@@ -56,13 +60,19 @@ class CallbackMixin(object):
     def __init__(self, *args, **kwargs):
         super(CallbackMixin, self).__init__(*args, **kwargs)
         self.signal_callbacks = defaultdict(list)
+        self.signal_proxy_targets = []
 
     def register_callback(self, signal, callback):
         self.signal_callbacks[signal].append(callback)
 
-    def send_signal(self, signal, *args):
+    def proxy_signals_to(self, target):
+        self.signal_proxy_targets.append(target)
+
+    def send_signal(self, signal):
         for callback in self.signal_callbacks[signal]:
-            callback(*args)
+            callback()
+        for target in self.signal_proxy_targets:
+            target.send_signal(signal)
 
 
 class Resumable(CallbackMixin):
@@ -82,7 +92,8 @@ class Resumable(CallbackMixin):
     def add_file(self, path):
         file = ResumableFile(path, self.chunk_size)
         self.files.append(file)
-        self.send_signal(ResumableSignal.FILE_ADDED, file)
+        self.send_signal(ResumableSignal.FILE_ADDED)
+        file.proxy_signals_to(self)
 
     def wait_until_complete(self):
         self.worker_pool.join()
@@ -106,15 +117,10 @@ class Resumable(CallbackMixin):
     def next_task(self):
         for chunk in self.chunks:
             if chunk.state == ResumableChunkState.QUEUED:
-                def completion_callback():
-                    self.send_signal(ResumableSignal.CHUNK_COMPLETED, chunk)
-                    if chunk.file.completed:
-                        self.send_signal(ResumableSignal.FILE_COMPLETED,
-                                         chunk.file)
-                return chunk.create_task(self.target, self.headers,
-                                         completion_callback)
+                return chunk.create_task(self.target, self.headers)
 
-class ResumableFile(object):
+
+class ResumableFile(CallbackMixin):
 
     def __init__(self, path, chunk_size):
         self.path = path
@@ -127,6 +133,10 @@ class ResumableFile(object):
 
         n_chunks = math.ceil(self.size / float(self.chunk_size))
         self.chunks = [ResumableChunk(self, i) for i in range(n_chunks)]
+        for chunk in self.chunks:
+            chunk.proxy_signals_to(self)
+            chunk.register_callback(ResumableChunk.CHUNK_COMPLETED,
+                                    self.handle_chunk_completion)
 
     @property
     def name(self):
@@ -148,6 +158,11 @@ class ResumableFile(object):
         else:
             return True
 
+    def handle_chunk_completion(self):
+        if self.completed:
+            self.send_signal(ResumableSignal.FILE_COMPLETED, self)
+            self.close()
+
 
 class ResumableChunkState(Enum):
     QUEUED = 0
@@ -155,7 +170,8 @@ class ResumableChunkState(Enum):
     UPLOADING = 2
     DONE = 3
 
-class ResumableChunk(object):
+
+class ResumableChunk(CallbackMixin):
 
     def __init__(self, file, chunk_index):
         self.file = file
@@ -188,6 +204,7 @@ class ResumableChunk(object):
                                 data=self._query(chunk_data))
         if response.status_code == 200:
             self.state = ResumableChunkState.DONE
+            self.send_signal(ResumableSignal.CHUNK_COMPLETED, self)
 
     def send(self, target, headers=None):
         self.state = ResumableChunkState.UPLOADING
@@ -197,13 +214,12 @@ class ResumableChunk(object):
                                  files={'file': chunk_data})
         response.raise_for_status()
         self.state = ResumableChunkState.DONE
+        self.send_signal(ResumableSignal.CHUNK_COMPLETED, self)
 
-    def create_task(self, target, headers=None, completion_callback=None):
+    def create_task(self, target, headers=None):
         def task():
             self.test(target, headers)
             if self.state != ResumableChunkState.DONE:
                 self.send(target, headers)
-            if completion_callback is not None:
-                completion_callback()
         self.state = ResumableChunkState.POPPED
         return task
