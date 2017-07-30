@@ -3,10 +3,12 @@ from enum import Enum
 import uuid
 import math
 from collections import defaultdict
-from threading import Thread, Lock
-import time
+from threading import Lock
 
 import requests
+
+from resumable.worker import ResumableWorkerPool
+
 
 MB = 1024 * 1024
 
@@ -15,44 +17,6 @@ class ResumableSignal(Enum):
     CHUNK_COMPLETED = 0
     FILE_ADDED = 1
     FILE_COMPLETED = 2
-
-
-NEXT_TASK_LOCK = Lock()
-
-
-class ResumableWorkerPool(object):
-
-    def __init__(self, num_workers, get_task):
-        self.workers = [ResumableWorker(get_task) for _ in range(num_workers)]
-        for worker in self.workers:
-            worker.start()
-
-    def join(self):
-        for worker in self.workers:
-            worker.poll = False
-        for worker in self.workers:
-            worker.join()
-
-
-class ResumableWorker(Thread):
-
-    def __init__(self, get_task, poll=True):
-        super(ResumableWorker, self).__init__()
-        self.get_task = get_task
-        self.poll = poll
-
-    def run(self):
-        while True:
-            with NEXT_TASK_LOCK:
-                task = self.get_task()
-            while task:
-                task()
-                with NEXT_TASK_LOCK:
-                    task = self.get_task()
-            if self.poll:
-                time.sleep(0.1)
-            else:
-                break
 
 
 class CallbackMixin(object):
@@ -191,7 +155,7 @@ class ResumableChunk(CallbackMixin):
             'resumableChunkSize': self.file.chunk_size,
             'resumableCurrentChunkSize': len(chunk_data),
             'resumableTotalSize': self.file.size,
-            #'resumableType': '', TODO: guess mime type?
+            # 'resumableType': '', TODO: guess mime type?
             'resumableIdentifier': str(self.file.unique_identifier),
             'resumableFileName': self.file.name,
             'resumableRelativePath': self.file.path,
