@@ -114,6 +114,7 @@ class ResumableFile(object):
 
         self.size = os.path.getsize(path)
         self._fp = open(path, 'rb')
+        self._fp_lock = Lock()
         self.unique_identifier = uuid.uuid4()
 
         n_chunks = math.ceil(self.size / float(self.chunk_size))
@@ -127,9 +128,9 @@ class ResumableFile(object):
         self._fp.close()
 
     def load_bytes(self, start, size):
-        # TODO: Lock when async
-        self._fp.seek(start)
-        return self._fp.read(size)
+        with self._fp_lock:
+            self._fp.seek(start)
+            return self._fp.read(size)
 
     @property
     def completed(self):
