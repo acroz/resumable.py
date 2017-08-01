@@ -33,7 +33,7 @@ def mock_lock(monkeypatch):
 
 @pytest.fixture
 def mock_open(monkeypatch):
-    file = Mock(seek=MagicMock(), read=MagicMock())
+    file = Mock(seek=MagicMock(), read=MagicMock(), close=MagicMock())
     open = MagicMock(return_value=file)
     monkeypatch.setattr(builtins, 'open', open)
     return open
@@ -44,6 +44,12 @@ def test_file(sample_file):
     assert file.path == sample_file
     assert file.chunk_size == TEST_CHUNK_SIZE
     assert file.size == len(SAMPLE_CONTENT)
+
+
+def test_close(sample_file, mock_open):
+    file = LazyLoadChunkableFile(sample_file, TEST_CHUNK_SIZE)
+    file.close()
+    mock_open.return_value.close.assert_called_once()
 
 
 def test_read_bytes(sample_file):
