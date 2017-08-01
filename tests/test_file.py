@@ -27,3 +27,4 @@ def test_chunking(sample_file):
     assert len(list(file.chunks)) == len(list(expected_chunk_data()))
     for chunk, expected_data in zip(file.chunks, expected_chunk_data()):
         assert chunk.data == expected_data
+        assert chunk.size == len(expected_data)
