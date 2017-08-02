@@ -23,6 +23,7 @@ setup(
         'mock'
     ],
     install_requires=[
+        'enum34',
         'requests'
     ]
 )
