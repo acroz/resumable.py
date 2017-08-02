@@ -76,7 +76,8 @@ class Resumable(CallbackMixin):
     @property
     def chunks(self):
         for file in self.files:
-            yield from file.chunks
+            for chunk in file.chunks:
+                yield file.chunks
 
     def next_task(self):
         for chunk in self.chunks:
