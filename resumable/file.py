@@ -5,12 +5,12 @@ from threading import Lock
 class LazyLoadChunkableFile(object):
 
     def __init__(self, path, chunk_size):
-        self.path = path
-        self.chunk_size = chunk_size
+        self.path = str(path)
+        self.chunk_size = int(chunk_size)
 
-        self.size = os.path.getsize(path)
+        self.size = os.path.getsize(self.path)
 
-        self._fp = open(path, 'rb')
+        self._fp = open(self.path, 'rb')
         self._fp_lock = Lock()
 
     def close(self):
