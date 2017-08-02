@@ -1,4 +1,3 @@
-import os.path
 from setuptools import find_packages, setup
 
 
@@ -15,5 +14,12 @@ setup(
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 3',
     ],
-    packages=find_packages()
+    packages=find_packages(),
+    setup_requires=['pytest-runner'],
+    tests_require=[
+        'pytest',
+        'pytest-cov',
+        'six',
+        'mock'
+    ]
 )
