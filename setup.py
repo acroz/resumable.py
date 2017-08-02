@@ -21,5 +21,8 @@ setup(
         'pytest-cov',
         'six',
         'mock'
+    ],
+    install_requires=[
+        'requests'
     ]
 )
