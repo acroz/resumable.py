@@ -158,6 +158,12 @@ class ResumableChunk(CallbackMixin):
         self.chunk = chunk
         self.state = ResumableChunkState.QUEUED
 
+    def __eq__(self, other):
+        return (isinstance(other, ResumableChunk) and
+                self.file == other.file and
+                self.chunk == other.chunk and
+                self.state == other.state)
+
     @property
     def query(self):
         query = {
