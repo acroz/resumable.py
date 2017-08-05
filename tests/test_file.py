@@ -6,7 +6,7 @@ import resumable.file
 from resumable.file import LazyLoadChunkableFile
 
 
-SAMPLE_CONTENT = b"sample content afsdfas"
+SAMPLE_CONTENT = b'sample content afsdfas'
 TEST_CHUNK_SIZE = 10
 
 
