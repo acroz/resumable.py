@@ -54,7 +54,8 @@ class Resumable(CallbackMixin):
                                                self.next_task)
 
     def add_file(self, path):
-        file = ResumableFile(path, self.chunk_size)
+        lazy_load_file = LazyLoadChunkableFile(path, self.chunk_size)
+        file = ResumableFile(lazy_load_file)
         self.files.append(file)
         self.send_signal(ResumableSignal.FILE_ADDED)
         file.proxy_signals_to(self)
@@ -87,10 +88,10 @@ class Resumable(CallbackMixin):
 
 class ResumableFile(CallbackMixin):
 
-    def __init__(self, path, chunk_size):
+    def __init__(self, file):
         super(ResumableFile, self).__init__()
 
-        self.file = LazyLoadChunkableFile(path, chunk_size)
+        self.file = file
         self.unique_identifier = uuid.uuid4()
 
         self.chunks = [ResumableChunk(self, chunk)
