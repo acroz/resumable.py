@@ -180,10 +180,13 @@ class ResumableChunk(CallbackMixin):
         self.state = ResumableChunkState.DONE
         self.send_signal(ResumableSignal.CHUNK_COMPLETED)
 
+    def send_if_not_done(self, target, headers=None):
+        if self.state != ResumableChunkState.DONE:
+            self.send(target, headers)
+
     def create_task(self, target, headers=None):
         def task():
             self.test(target, headers)
-            if self.state != ResumableChunkState.DONE:
-                self.send(target, headers)
+            self.send_if_not_done(target, headers)
         self.state = ResumableChunkState.POPPED
         return task
