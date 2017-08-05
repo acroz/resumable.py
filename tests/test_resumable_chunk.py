@@ -81,10 +81,12 @@ def test_send_if_not_done(state, should_send):
     mock_target = 'https://example.com/upload'
     mock_headers = {'header': 'bar'}
     mock_send = MagicMock()
+
     with patch.multiple(ResumableChunk, send=mock_send):
         chunk = ResumableChunk(Mock(), Mock())
         chunk.state = state
         chunk.send_if_not_done(mock_target, mock_headers)
+
     if should_send:
         mock_send.assert_called_once_with(mock_target, mock_headers)
     else:
@@ -96,11 +98,13 @@ def test_create_task():
     mock_headers = {'header': 'bar'}
     mock_test = MagicMock()
     mock_send_if_not_done = MagicMock()
+
     with patch.multiple(ResumableChunk, test=mock_test,
                         send_if_not_done=mock_send_if_not_done):
         chunk = ResumableChunk(Mock(), Mock())
         task = chunk.create_task(mock_target, mock_headers)
         assert chunk.state == ResumableChunkState.POPPED
         task()
-        mock_test.assert_called_once()
-        mock_send_if_not_done.assert_called_once()
+
+    mock_test.assert_called_once()
+    mock_send_if_not_done.assert_called_once()

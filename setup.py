@@ -20,7 +20,8 @@ setup(
         'pytest',
         'pytest-cov',
         'six',
-        'mock'
+        'mock',
+        'pytest-mock'
     ],
     install_requires=[
         'enum34',
