@@ -1,8 +1,7 @@
 import pytest
 from mock import Mock, MagicMock
 
-from resumable.core import Resumable, ResumableFile, ResumableSignal
-from resumable.file import LazyLoadChunkableFile
+from resumable.core import Resumable, ResumableSignal, ResumableChunkState
 
 
 MOCK_TARGET = 'https://example.com/upload'
@@ -85,3 +84,16 @@ def test_chunks(worker_pool_mock):
         Mock(chunks=range(6, 10))
     ]
     assert list(manager.chunks) == list(range(10))
+
+
+def test_next_task(mocker, worker_pool_mock):
+    mock_chunks = [
+        Mock(state=ResumableChunkState.DONE),
+        Mock(state=ResumableChunkState.POPPED),
+        Mock(state=ResumableChunkState.UPLOADING),
+        Mock(state=ResumableChunkState.QUEUED),
+        Mock(state=ResumableChunkState.QUEUED)
+    ]
+    mocker.patch.object(Resumable, 'chunks', mock_chunks)
+    manager = Resumable(MOCK_TARGET)
+    assert manager.next_task() == mock_chunks[3].create_task.return_value
