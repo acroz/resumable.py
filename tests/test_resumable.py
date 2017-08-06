@@ -63,3 +63,15 @@ def test_close(worker_pool_mock):
     # TODO: should also ensure worker pool is closed
     for mock_file in manager.files:
         mock_file.close.assert_called_once()
+
+
+def test_context_manager(worker_pool_mock):
+    manager = Resumable(MOCK_TARGET)
+    manager.wait_until_complete = MagicMock()
+    manager.close = MagicMock()
+
+    with manager as entered_manager:
+        assert manager == entered_manager
+
+    manager.wait_until_complete.assert_called_once()
+    manager.close.assert_called_once()
