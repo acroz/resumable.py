@@ -53,3 +53,13 @@ def test_wait_until_complete(worker_pool_mock):
     manager = Resumable(MOCK_TARGET)
     manager.wait_until_complete()
     worker_pool_mock.return_value.join.assert_called_once()
+
+
+def test_close(worker_pool_mock):
+    manager = Resumable(MOCK_TARGET)
+    manager.files = [MagicMock(), MagicMock(), MagicMock()]
+    manager.close()
+
+    # TODO: should also ensure worker pool is closed
+    for mock_file in manager.files:
+        mock_file.close.assert_called_once()
