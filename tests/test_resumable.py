@@ -47,3 +47,9 @@ def test_add_file(mocker, worker_pool_mock):
     assert manager.files == [file_mock.return_value]
     manager.send_signal.assert_called_once_with(ResumableSignal.FILE_ADDED)
     file_mock.return_value.proxy_signals_to.assert_called_once_with(manager)
+
+
+def test_wait_until_complete(worker_pool_mock):
+    manager = Resumable(MOCK_TARGET)
+    manager.wait_until_complete()
+    worker_pool_mock.return_value.join.assert_called_once()
