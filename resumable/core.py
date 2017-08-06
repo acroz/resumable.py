@@ -54,7 +54,8 @@ class Resumable(CallbackMixin):
                                                self.next_task)
 
     def add_file(self, path):
-        file = ResumableFile(path, self.chunk_size)
+        lazy_load_file = LazyLoadChunkableFile(path, self.chunk_size)
+        file = ResumableFile(lazy_load_file)
         self.files.append(file)
         self.send_signal(ResumableSignal.FILE_ADDED)
         file.proxy_signals_to(self)
@@ -76,7 +77,8 @@ class Resumable(CallbackMixin):
     @property
     def chunks(self):
         for file in self.files:
-            yield from file.chunks
+            for chunk in file.chunks:
+                yield chunk
 
     def next_task(self):
         for chunk in self.chunks:
@@ -86,10 +88,10 @@ class Resumable(CallbackMixin):
 
 class ResumableFile(CallbackMixin):
 
-    def __init__(self, path, chunk_size):
+    def __init__(self, file):
         super(ResumableFile, self).__init__()
 
-        self.file = LazyLoadChunkableFile(path, chunk_size)
+        self.file = file
         self.unique_identifier = uuid.uuid4()
 
         self.chunks = [ResumableChunk(self, chunk)
@@ -138,7 +140,7 @@ class ResumableFile(CallbackMixin):
     def handle_chunk_completion(self):
         if self.completed:
             self.send_signal(ResumableSignal.FILE_COMPLETED)
-            self.file.close()
+            self.close()
 
 
 class ResumableChunkState(Enum):
@@ -155,6 +157,12 @@ class ResumableChunk(CallbackMixin):
         self.file = file
         self.chunk = chunk
         self.state = ResumableChunkState.QUEUED
+
+    def __eq__(self, other):
+        return (isinstance(other, ResumableChunk) and
+                self.file == other.file and
+                self.chunk == other.chunk and
+                self.state == other.state)
 
     @property
     def query(self):
@@ -179,10 +187,13 @@ class ResumableChunk(CallbackMixin):
         self.state = ResumableChunkState.DONE
         self.send_signal(ResumableSignal.CHUNK_COMPLETED)
 
+    def send_if_not_done(self, target, headers=None):
+        if self.state != ResumableChunkState.DONE:
+            self.send(target, headers)
+
     def create_task(self, target, headers=None):
         def task():
             self.test(target, headers)
-            if self.state != ResumableChunkState.DONE:
-                self.send(target, headers)
+            self.send_if_not_done(target, headers)
         self.state = ResumableChunkState.POPPED
         return task
