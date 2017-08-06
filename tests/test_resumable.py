@@ -1,5 +1,5 @@
 import pytest
-from mock import MagicMock
+from mock import Mock, MagicMock
 
 from resumable.core import Resumable, ResumableFile, ResumableSignal
 from resumable.file import LazyLoadChunkableFile
@@ -75,3 +75,13 @@ def test_context_manager(worker_pool_mock):
 
     manager.wait_until_complete.assert_called_once()
     manager.close.assert_called_once()
+
+
+def test_chunks(worker_pool_mock):
+    manager = Resumable(MOCK_TARGET)
+    manager.files = [
+        Mock(chunks=range(4)),
+        Mock(chunks=range(4, 6)),
+        Mock(chunks=range(6, 10))
+    ]
+    assert list(manager.chunks) == list(range(10))

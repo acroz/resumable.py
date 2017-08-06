@@ -78,7 +78,7 @@ class Resumable(CallbackMixin):
     def chunks(self):
         for file in self.files:
             for chunk in file.chunks:
-                yield file.chunks
+                yield chunk
 
     def next_task(self):
         for chunk in self.chunks:
