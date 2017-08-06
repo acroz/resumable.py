@@ -1,5 +1,7 @@
 # Resumable.py
 
+[![Build Status](https://travis-ci.org/acroz/resumable.py.svg?branch=master)](https://travis-ci.org/acroz/resumable.py)
+
 Resumable.py provides chunked uploading of files to a compatible server,
 emulating the popular [Resumable.js] JavaScript library.
 
