@@ -102,6 +102,9 @@ class ResumableFile(CallbackMixin):
             chunk.register_callback(ResumableSignal.CHUNK_COMPLETED,
                                     self.handle_chunk_completion)
 
+    def close(self):
+        self.file.close()
+
     @property
     def type(self):
         """Mimic the type parameter of a JS File object.
@@ -137,7 +140,7 @@ class ResumableFile(CallbackMixin):
     def handle_chunk_completion(self):
         if self.completed:
             self.send_signal(ResumableSignal.FILE_COMPLETED)
-            self.file.close()
+            self.close()
 
 
 class ResumableChunkState(Enum):

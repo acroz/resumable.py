@@ -30,6 +30,13 @@ def test_file(mocker):
     )
 
 
+def test_close():
+    mock_lazy_load_file = MagicMock(LazyLoadChunkableFile)
+    file = ResumableFile(mock_lazy_load_file)
+    file.close()
+    mock_lazy_load_file.close.assert_called_once()
+
+
 def test_type(mocker):
     mock_lazy_load_file = MagicMock(LazyLoadChunkableFile, path='file.txt')
     file = ResumableFile(mock_lazy_load_file)
