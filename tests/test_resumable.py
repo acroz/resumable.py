@@ -8,11 +8,16 @@ MOCK_TARGET = 'https://example.com/upload'
 
 
 @pytest.fixture
+def session_mock(mocker):
+    return mocker.patch('requests.Session')
+
+
+@pytest.fixture
 def worker_pool_mock(mocker):
     return mocker.patch('resumable.core.ResumableWorkerPool')
 
 
-def test_resumable(worker_pool_mock):
+def test_resumable(session_mock, worker_pool_mock):
     mock_sim_uploads = 5
     mock_chunk_size = 100
     mock_headers = {'header': 'foo'}
@@ -22,15 +27,19 @@ def test_resumable(worker_pool_mock):
 
     assert manager.target == MOCK_TARGET
     assert manager.chunk_size == mock_chunk_size
-    assert manager.headers == mock_headers
+
+    assert manager.session == session_mock.return_value
+    manager.session.headers.update.assert_called_once_with(mock_headers)
+
     assert manager.files == []
 
+    assert manager.worker_pool == worker_pool_mock.return_value
     worker_pool_mock.assert_called_once_with(
         mock_sim_uploads, manager.next_task
     )
 
 
-def test_add_file(mocker, worker_pool_mock):
+def test_add_file(mocker, session_mock, worker_pool_mock):
     lazy_load_file_mock = mocker.patch('resumable.core.LazyLoadChunkableFile')
     file_mock = mocker.patch('resumable.core.ResumableFile')
 
@@ -48,13 +57,13 @@ def test_add_file(mocker, worker_pool_mock):
     file_mock.return_value.proxy_signals_to.assert_called_once_with(manager)
 
 
-def test_wait_until_complete(worker_pool_mock):
+def test_wait_until_complete(session_mock, worker_pool_mock):
     manager = Resumable(MOCK_TARGET)
     manager.wait_until_complete()
     worker_pool_mock.return_value.join.assert_called_once()
 
 
-def test_close(worker_pool_mock):
+def test_close(session_mock, worker_pool_mock):
     manager = Resumable(MOCK_TARGET)
     manager.files = [MagicMock(), MagicMock(), MagicMock()]
     manager.close()
@@ -64,7 +73,7 @@ def test_close(worker_pool_mock):
         mock_file.close.assert_called_once()
 
 
-def test_context_manager(worker_pool_mock):
+def test_context_manager(session_mock, worker_pool_mock):
     manager = Resumable(MOCK_TARGET)
     manager.wait_until_complete = MagicMock()
     manager.close = MagicMock()
@@ -76,7 +85,7 @@ def test_context_manager(worker_pool_mock):
     manager.close.assert_called_once()
 
 
-def test_chunks(worker_pool_mock):
+def test_chunks(session_mock, worker_pool_mock):
     manager = Resumable(MOCK_TARGET)
     manager.files = [
         Mock(chunks=range(4)),
@@ -86,7 +95,7 @@ def test_chunks(worker_pool_mock):
     assert list(manager.chunks) == list(range(10))
 
 
-def test_next_task(mocker, worker_pool_mock):
+def test_next_task(mocker, session_mock, worker_pool_mock):
     mock_chunks = [
         Mock(state=ResumableChunkState.DONE),
         Mock(state=ResumableChunkState.POPPED),
@@ -97,3 +106,6 @@ def test_next_task(mocker, worker_pool_mock):
     mocker.patch.object(Resumable, 'chunks', mock_chunks)
     manager = Resumable(MOCK_TARGET)
     assert manager.next_task() == mock_chunks[3].create_task.return_value
+    mock_chunks[3].create_task.assert_called_once_with(
+        manager.session, manager.target
+    )
