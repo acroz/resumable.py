@@ -7,7 +7,7 @@ import requests
 
 from resumable.file import LazyLoadChunkableFile
 from resumable.worker import ResumableWorkerPool
-from resumable.util import CallbackMixin
+from resumable.util import CallbackMixin, FixedUrlSession
 
 
 MB = 1024 * 1024
@@ -68,7 +68,8 @@ class Resumable(CallbackMixin):
     def next_task(self):
         for chunk in self.chunks:
             if chunk.state == ResumableChunkState.QUEUED:
-                return chunk.create_task(self.session, self.target)
+                wrapped_session = FixedUrlSession(self.session, self.target)
+                return chunk.create_task(wrapped_session)
 
 
 class ResumableFile(CallbackMixin):
@@ -158,27 +159,27 @@ class ResumableChunk(CallbackMixin):
         query.update(self.file.query)
         return query
 
-    def test(self, session, target):
-        response = session.get(target, data=self.query)
+    def test(self, session):
+        response = session.get(data=self.query)
         if response.status_code == 200:
             self.state = ResumableChunkState.DONE
             self.send_signal(ResumableSignal.CHUNK_COMPLETED)
 
-    def send(self, session, target):
+    def send(self, session):
         self.state = ResumableChunkState.UPLOADING
-        response = session.post(target, data=self.query,
+        response = session.post(data=self.query,
                                 files={'file': self.chunk.data})
         response.raise_for_status()
         self.state = ResumableChunkState.DONE
         self.send_signal(ResumableSignal.CHUNK_COMPLETED)
 
-    def send_if_not_done(self, session, target):
+    def send_if_not_done(self, session):
         if self.state != ResumableChunkState.DONE:
-            self.send(session, target)
+            self.send(session)
 
-    def create_task(self, session, target):
+    def create_task(self, session):
         def task():
-            self.test(session, target)
-            self.send_if_not_done(session, target)
+            self.test(session)
+            self.send_if_not_done(session)
         self.state = ResumableChunkState.POPPED
         return task

@@ -96,6 +96,7 @@ def test_chunks(session_mock, worker_pool_mock):
 
 
 def test_next_task(mocker, session_mock, worker_pool_mock):
+    fixed_url_session_mock = mocker.patch('resumable.core.FixedUrlSession')
     mock_chunks = [
         Mock(state=ResumableChunkState.DONE),
         Mock(state=ResumableChunkState.POPPED),
@@ -107,5 +108,8 @@ def test_next_task(mocker, session_mock, worker_pool_mock):
     manager = Resumable(MOCK_TARGET)
     assert manager.next_task() == mock_chunks[3].create_task.return_value
     mock_chunks[3].create_task.assert_called_once_with(
-        manager.session, manager.target
+        fixed_url_session_mock.return_value
+    )
+    fixed_url_session_mock.assert_called_once_with(
+        session_mock.return_value, MOCK_TARGET
     )
