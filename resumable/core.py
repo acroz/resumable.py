@@ -1,13 +1,13 @@
 import os
 from enum import Enum
 import uuid
-from collections import defaultdict
 import mimetypes
 
 import requests
 
 from resumable.file import LazyLoadChunkableFile
 from resumable.worker import ResumableWorkerPool
+from resumable.util import CallbackMixin, FixedUrlSession
 
 
 MB = 1024 * 1024
@@ -19,26 +19,6 @@ class ResumableSignal(Enum):
     FILE_COMPLETED = 2
 
 
-class CallbackMixin(object):
-
-    def __init__(self, *args, **kwargs):
-        super(CallbackMixin, self).__init__(*args, **kwargs)
-        self.signal_callbacks = defaultdict(list)
-        self.signal_proxy_targets = []
-
-    def register_callback(self, signal, callback):
-        self.signal_callbacks[signal].append(callback)
-
-    def proxy_signals_to(self, target):
-        self.signal_proxy_targets.append(target)
-
-    def send_signal(self, signal):
-        for callback in self.signal_callbacks[signal]:
-            callback()
-        for target in self.signal_proxy_targets:
-            target.send_signal(signal)
-
-
 class Resumable(CallbackMixin):
 
     def __init__(self, target, simultaneous_uploads=3, chunk_size=MB,
@@ -46,7 +26,12 @@ class Resumable(CallbackMixin):
         super(Resumable, self).__init__()
         self.target = target
         self.chunk_size = chunk_size
-        self.headers = headers
+
+        self.session = requests.Session()
+
+        # TODO: Set User-Agent as python-resumable/version
+        if headers:
+            self.session.headers.update(headers)
 
         self.files = []
 
@@ -83,7 +68,8 @@ class Resumable(CallbackMixin):
     def next_task(self):
         for chunk in self.chunks:
             if chunk.state == ResumableChunkState.QUEUED:
-                return chunk.create_task(self.target, self.headers)
+                wrapped_session = FixedUrlSession(self.session, self.target)
+                return chunk.create_task(wrapped_session)
 
 
 class ResumableFile(CallbackMixin):
@@ -173,27 +159,27 @@ class ResumableChunk(CallbackMixin):
         query.update(self.file.query)
         return query
 
-    def test(self, target, headers=None):
-        response = requests.get(target, headers=headers, data=self.query)
+    def test(self, session):
+        response = session.get(data=self.query)
         if response.status_code == 200:
             self.state = ResumableChunkState.DONE
             self.send_signal(ResumableSignal.CHUNK_COMPLETED)
 
-    def send(self, target, headers=None):
+    def send(self, session):
         self.state = ResumableChunkState.UPLOADING
-        response = requests.post(target, headers=headers, data=self.query,
-                                 files={'file': self.chunk.data})
+        response = session.post(data=self.query,
+                                files={'file': self.chunk.data})
         response.raise_for_status()
         self.state = ResumableChunkState.DONE
         self.send_signal(ResumableSignal.CHUNK_COMPLETED)
 
-    def send_if_not_done(self, target, headers=None):
+    def send_if_not_done(self, session):
         if self.state != ResumableChunkState.DONE:
-            self.send(target, headers)
+            self.send(session)
 
-    def create_task(self, target, headers=None):
+    def create_task(self, session):
         def task():
-            self.test(target, headers)
-            self.send_if_not_done(target, headers)
+            self.test(session)
+            self.send_if_not_done(session)
         self.state = ResumableChunkState.POPPED
         return task

@@ -1,6 +1,7 @@
 from mock import Mock, MagicMock
 
-from resumable.core import CallbackMixin, ResumableSignal
+from resumable.util import CallbackMixin
+from resumable.core import ResumableSignal
 
 
 def test_register_callback():
