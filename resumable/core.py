@@ -7,7 +7,7 @@ import requests
 
 from resumable.file import LazyLoadChunkableFile
 from resumable.worker import ResumableWorkerPool
-from resumable.util import CallbackMixin, FixedUrlSession
+from resumable.util import CallbackMixin, FixedUrlSession, Config
 
 
 MB = 1024 * 1024
@@ -22,10 +22,16 @@ class ResumableSignal(Enum):
 class Resumable(CallbackMixin):
 
     def __init__(self, target, simultaneous_uploads=3, chunk_size=MB,
-                 headers=None):
+                 headers=None, max_chunk_retries=100):
         super(Resumable, self).__init__()
-        self.target = target
-        self.chunk_size = chunk_size
+
+        self.config = Config(
+            target=target,
+            headers=headers,
+            simultaneous_uploads=simultaneous_uploads,
+            chunk_size=chunk_size,
+            max_chunk_retries=max_chunk_retries
+        )
 
         self.session = requests.Session()
 
@@ -39,8 +45,8 @@ class Resumable(CallbackMixin):
                                                self.next_task)
 
     def add_file(self, path):
-        lazy_load_file = LazyLoadChunkableFile(path, self.chunk_size)
-        file = ResumableFile(lazy_load_file)
+        lazy_load_file = LazyLoadChunkableFile(path, self.config.chunk_size)
+        file = ResumableFile(self.config, lazy_load_file)
         self.files.append(file)
         self.send_signal(ResumableSignal.FILE_ADDED)
         file.proxy_signals_to(self)
@@ -68,19 +74,23 @@ class Resumable(CallbackMixin):
     def next_task(self):
         for chunk in self.chunks:
             if chunk.state == ResumableChunkState.QUEUED:
-                wrapped_session = FixedUrlSession(self.session, self.target)
+                wrapped_session = FixedUrlSession(
+                    self.session,
+                    self.config.target
+                )
                 return chunk.create_task(wrapped_session)
 
 
 class ResumableFile(CallbackMixin):
 
-    def __init__(self, file):
+    def __init__(self, config, file):
         super(ResumableFile, self).__init__()
 
+        self.config = config
         self.file = file
         self.unique_identifier = uuid.uuid4()
 
-        self.chunks = [ResumableChunk(self, chunk)
+        self.chunks = [ResumableChunk(self.config, self, chunk)
                        for chunk in self.file.chunks]
 
         for chunk in self.chunks:
@@ -138,8 +148,9 @@ class ResumableChunkState(Enum):
 
 class ResumableChunk(CallbackMixin):
 
-    def __init__(self, file, chunk):
+    def __init__(self, config, file, chunk):
         super(ResumableChunk, self).__init__()
+        self.config = config
         self.file = file
         self.chunk = chunk
         self.state = ResumableChunkState.QUEUED

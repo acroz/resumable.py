@@ -10,7 +10,7 @@ def test_query():
     """Query merges its own with that of its source file."""
     mock_file = Mock(query={'dummy': 'query'})
     mock_chunk = Mock(index=3, size=100)
-    chunk = ResumableChunk(mock_file, mock_chunk)
+    chunk = ResumableChunk(Mock(), mock_file, mock_chunk)
     assert chunk.query == {
         'dummy': 'query',
         'resumableChunkNumber': 4,
@@ -31,7 +31,7 @@ def test_test(get_response_code, expected_state):
 
     with patch.multiple(ResumableChunk, query=mock_query,
                         send_signal=mock_send_signal):
-        chunk = ResumableChunk(Mock(), Mock())
+        chunk = ResumableChunk(Mock(), Mock(), Mock())
         chunk.test(mock_session)
 
     mock_session.get.assert_called_once_with(data=mock_query)
@@ -51,7 +51,7 @@ def test_send():
 
     with patch.multiple(ResumableChunk, query=mock_query,
                         send_signal=mock_send_signal):
-        chunk = ResumableChunk(Mock(), Mock(data=mock_data))
+        chunk = ResumableChunk(Mock(), Mock(), Mock(data=mock_data))
         chunk.send(mock_session)
 
     mock_session.post.assert_called_once_with(
@@ -71,7 +71,7 @@ def test_send_if_not_done(state, should_send):
     mock_send = MagicMock()
 
     with patch.multiple(ResumableChunk, send=mock_send):
-        chunk = ResumableChunk(Mock(), Mock())
+        chunk = ResumableChunk(Mock(), Mock(), Mock())
         chunk.state = state
         chunk.send_if_not_done(mock_session)
 
@@ -88,7 +88,7 @@ def test_create_task():
 
     with patch.multiple(ResumableChunk, test=mock_test,
                         send_if_not_done=mock_send_if_not_done):
-        chunk = ResumableChunk(Mock(), Mock())
+        chunk = ResumableChunk(Mock(), Mock(), Mock())
         task = chunk.create_task(mock_session)
         assert chunk.state == ResumableChunkState.POPPED
         task()
