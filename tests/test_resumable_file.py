@@ -13,13 +13,16 @@ def test_file(mocker):
     proxy_signals_spy = mocker.spy(ResumableChunk, 'proxy_signals_to')
     register_callback_spy = mocker.spy(ResumableChunk, 'register_callback')
 
+    mock_session = Mock()
     mock_config = Mock()
     mock_lazy_load_file = Mock(LazyLoadChunkableFile, chunks=[Mock(), Mock()])
 
-    file = ResumableFile(mock_config, mock_lazy_load_file)
+    file = ResumableFile(mock_session, mock_config, mock_lazy_load_file)
 
-    assert file.chunks == [ResumableChunk(mock_config, file, chunk)
-                           for chunk in mock_lazy_load_file.chunks]
+    assert file.chunks == [
+        ResumableChunk(mock_session, mock_config, file, chunk)
+        for chunk in mock_lazy_load_file.chunks
+    ]
 
     proxy_signals_spy.assert_has_calls(
         [call(chunk, file) for chunk in file.chunks]
@@ -33,20 +36,20 @@ def test_file(mocker):
 
 def test_close():
     mock_lazy_load_file = MagicMock(LazyLoadChunkableFile)
-    file = ResumableFile(Mock(), mock_lazy_load_file)
+    file = ResumableFile(Mock(), Mock(), mock_lazy_load_file)
     file.close()
     mock_lazy_load_file.close.assert_called_once()
 
 
 def test_type(mocker):
     mock_lazy_load_file = MagicMock(LazyLoadChunkableFile, path='file.txt')
-    file = ResumableFile(Mock(), mock_lazy_load_file)
+    file = ResumableFile(Mock(), Mock(), mock_lazy_load_file)
     assert file.type == 'text/plain'
 
 
 def test_type_unrecognised(mocker):
     mock_lazy_load_file = MagicMock(LazyLoadChunkableFile, path='unknown')
-    file = ResumableFile(Mock(), mock_lazy_load_file)
+    file = ResumableFile(Mock(), Mock(), mock_lazy_load_file)
     assert file.type == ''
 
 
@@ -58,7 +61,7 @@ def test_query():
         chunk_size=100,
         chunks=[Mock(), Mock()]
     )
-    file = ResumableFile(Mock(), mock_lazy_load_file)
+    file = ResumableFile(Mock(), Mock(), mock_lazy_load_file)
     assert file.query == {
         'resumableChunkSize': mock_lazy_load_file.chunk_size,
         'resumableTotalSize': mock_lazy_load_file.size,
@@ -79,7 +82,7 @@ def test_query():
 def test_completed(chunk_states, completed):
     mock_lazy_load_file = Mock(LazyLoadChunkableFile,
                                chunks=[Mock() for _ in chunk_states])
-    file = ResumableFile(Mock(), mock_lazy_load_file)
+    file = ResumableFile(Mock(), Mock(), mock_lazy_load_file)
     for chunk, state in zip(file.chunks, chunk_states):
         chunk.state = state
     assert file.completed == completed
@@ -90,7 +93,7 @@ def test_handle_chunk_completion(mocker, file_completed):
     mocker.patch.object(ResumableFile, 'completed', file_completed)
 
     mock_lazy_load_file = MagicMock(LazyLoadChunkableFile)
-    file = ResumableFile(Mock(), mock_lazy_load_file)
+    file = ResumableFile(Mock(), Mock(), mock_lazy_load_file)
     file.send_signal = MagicMock()
 
     file.handle_chunk_completion()

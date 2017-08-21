@@ -61,7 +61,7 @@ def test_add_file(mocker, session_mock, worker_pool_mock):
         mock_path, manager.config.chunk_size
     )
     file_mock.assert_called_once_with(
-        manager.config, lazy_load_file_mock.return_value
+        manager.session, manager.config, lazy_load_file_mock.return_value
     )
     assert manager.files == [file_mock.return_value]
     manager.send_signal.assert_called_once_with(ResumableSignal.FILE_ADDED)
@@ -107,7 +107,6 @@ def test_chunks(session_mock, worker_pool_mock):
 
 
 def test_next_task(mocker, session_mock, worker_pool_mock):
-    fixed_url_session_mock = mocker.patch('resumable.core.FixedUrlSession')
     mock_chunks = [
         Mock(state=ResumableChunkState.DONE),
         Mock(state=ResumableChunkState.POPPED),
@@ -118,9 +117,3 @@ def test_next_task(mocker, session_mock, worker_pool_mock):
     mocker.patch.object(Resumable, 'chunks', mock_chunks)
     manager = Resumable(MOCK_TARGET)
     assert manager.next_task() == mock_chunks[3].create_task.return_value
-    mock_chunks[3].create_task.assert_called_once_with(
-        fixed_url_session_mock.return_value
-    )
-    fixed_url_session_mock.assert_called_once_with(
-        session_mock.return_value, MOCK_TARGET
-    )
