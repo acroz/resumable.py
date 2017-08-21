@@ -33,3 +33,13 @@ class FixedUrlSession(object):
 
     def post(self, *args, **kwargs):
         return self.session.post(self.url, *args, **kwargs)
+
+
+class Config(object):
+
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    def __eq__(self, other):
+        return isinstance(other, Config) and self.__dict__ == other.__dict__
