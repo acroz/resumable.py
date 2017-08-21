@@ -8,13 +8,20 @@ def test_config():
     assert config.foo == 'bar'
 
 
-def test_config_setattr():
+def test_setattr():
     config = Config()
     config.foo = 'bar'
     assert config.foo == 'bar'
 
 
-def test_config_eq():
+def test_str():
+    assert str(Config(foo='one', bar='two')) in [
+        "Config(foo='one', bar='two')",
+        "Config(bar='two', foo='one')"
+    ]
+
+
+def test_eq():
     assert Config(foo='bar') == Config(foo='bar')
 
 
@@ -23,5 +30,5 @@ def test_config_eq():
     Config(foo='other'),
     Config(foo='bar', other='other')
 ])
-def test_config_neq(other):
+def test_neq(other):
     assert Config(foo='bar') != other

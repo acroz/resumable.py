@@ -41,5 +41,13 @@ class Config(object):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+    def __str__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join(
+                '{}={}'.format(k, repr(v)) for k, v in self.__dict__.items()
+            )
+        )
+
     def __eq__(self, other):
         return isinstance(other, Config) and self.__dict__ == other.__dict__
