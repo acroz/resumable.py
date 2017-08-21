@@ -154,6 +154,8 @@ class ResumableChunk(CallbackMixin):
 
     def __eq__(self, other):
         return (isinstance(other, ResumableChunk) and
+                self.session == other.session and
+                self.config == other.config and
                 self.file == other.file and
                 self.chunk == other.chunk and
                 self.state == other.state)
