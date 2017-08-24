@@ -73,18 +73,18 @@ def test_query():
     }
 
 
-@pytest.mark.parametrize('chunk_states, completed', [
+@pytest.mark.parametrize('chunk_statuses, completed', [
     ([ResumableChunkState.QUEUED, ResumableChunkState.QUEUED], False),
     ([ResumableChunkState.DONE, ResumableChunkState.QUEUED], False),
     ([ResumableChunkState.DONE, ResumableChunkState.DONE], True),
     ([], True)
 ])
-def test_completed(chunk_states, completed):
+def test_completed(chunk_statuses, completed):
     mock_lazy_load_file = Mock(LazyLoadChunkableFile,
-                               chunks=[Mock() for _ in chunk_states])
+                               chunks=[Mock() for _ in chunk_statuses])
     file = ResumableFile(Mock(), Mock(), mock_lazy_load_file)
-    for chunk, state in zip(file.chunks, chunk_states):
-        chunk.state = state
+    for chunk, status in zip(file.chunks, chunk_statuses):
+        chunk.status = status
     assert file.completed == completed
 
 

@@ -18,11 +18,11 @@ def test_query():
     }
 
 
-@pytest.mark.parametrize('status_code, state, signal', [
+@pytest.mark.parametrize('status_code, status, signal', [
     (404, ResumableChunkState.QUEUED, None),
     (200, ResumableChunkState.DONE, ResumableSignal.CHUNK_COMPLETED)
 ])
-def test_test(status_code, state, signal):
+def test_test(status_code, status, signal):
     mock_session = MagicMock(requests.Session)
     mock_session.get.return_value = Mock(requests.Response,
                                          status_code=status_code)
@@ -39,17 +39,17 @@ def test_test(status_code, state, signal):
         mock_config.target,
         data=mock_query
     )
-    assert chunk.state == state
+    assert chunk.status == status
     if signal:
         mock_send_signal.assert_called_once_with(signal)
 
 
-@pytest.mark.parametrize('status_code, state, signal', [
+@pytest.mark.parametrize('status_code, status, signal', [
     (200, ResumableChunkState.DONE, ResumableSignal.CHUNK_COMPLETED),
     (400, ResumableChunkState.ERROR, ResumableSignal.CHUNK_FAILED),
     (418, ResumableChunkState.QUEUED, ResumableSignal.CHUNK_RETRY)
 ])
-def test_send(status_code, state, signal):
+def test_send(status_code, status, signal):
     mock_session = MagicMock(requests.Session)
     mock_session.post.return_value = Mock(requests.Response,
                                           status_code=status_code)
@@ -71,7 +71,7 @@ def test_send(status_code, state, signal):
         data=mock_query,
         files={'file': mock_data}
     )
-    assert chunk.state == state
+    assert chunk.status == status
     mock_send_signal.assert_called_once_with(signal)
 
 
@@ -91,13 +91,13 @@ def test_retry():
                                Mock(data=mock_data))
 
         chunk.send()
-        assert chunk.state == ResumableChunkState.QUEUED
+        assert chunk.status == ResumableChunkState.QUEUED
 
         chunk.send()
-        assert chunk.state == ResumableChunkState.QUEUED
+        assert chunk.status == ResumableChunkState.QUEUED
 
         chunk.send()
-        assert chunk.state == ResumableChunkState.ERROR
+        assert chunk.status == ResumableChunkState.ERROR
 
     mock_send_signal.assert_has_calls([
         call(ResumableSignal.CHUNK_RETRY),
@@ -106,17 +106,17 @@ def test_retry():
     ])
 
 
-@pytest.mark.parametrize('state, should_send', [
+@pytest.mark.parametrize('status, should_send', [
     (ResumableChunkState.QUEUED, True),
     (ResumableChunkState.POPPED, True),
     (ResumableChunkState.DONE, False)
 ])
-def test_send_if_not_done(state, should_send):
+def test_send_if_not_done(status, should_send):
     mock_send = MagicMock()
 
     with patch.multiple(ResumableChunk, send=mock_send):
         chunk = ResumableChunk(Mock(), Mock(), Mock(), Mock())
-        chunk.state = state
+        chunk.status = status
         chunk.send_if_not_done()
 
     if should_send:
@@ -133,7 +133,7 @@ def test_create_task():
                         send_if_not_done=mock_send_if_not_done):
         chunk = ResumableChunk(Mock(), Mock(), Mock(), Mock())
         task = chunk.create_task()
-        assert chunk.state == ResumableChunkState.POPPED
+        assert chunk.status == ResumableChunkState.POPPED
         task()
 
     mock_test.assert_called_once()

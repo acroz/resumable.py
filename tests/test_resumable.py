@@ -111,11 +111,11 @@ def test_chunks(session_mock, worker_pool_mock):
 
 def test_next_task(mocker, session_mock, worker_pool_mock):
     mock_chunks = [
-        Mock(state=ResumableChunkState.DONE),
-        Mock(state=ResumableChunkState.POPPED),
-        Mock(state=ResumableChunkState.UPLOADING),
-        Mock(state=ResumableChunkState.QUEUED),
-        Mock(state=ResumableChunkState.QUEUED)
+        Mock(status=ResumableChunkState.DONE),
+        Mock(status=ResumableChunkState.POPPED),
+        Mock(status=ResumableChunkState.UPLOADING),
+        Mock(status=ResumableChunkState.QUEUED),
+        Mock(status=ResumableChunkState.QUEUED)
     ]
     mocker.patch.object(Resumable, 'chunks', mock_chunks)
     manager = Resumable(MOCK_TARGET)
