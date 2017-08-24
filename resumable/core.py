@@ -77,7 +77,7 @@ class Resumable(CallbackMixin):
 
     def next_task(self):
         for chunk in self.chunks:
-            if chunk.status == ResumableChunkState.QUEUED:
+            if chunk.status == ResumableChunkState.PENDING:
                 return chunk.create_task()
 
 
@@ -140,7 +140,7 @@ class ResumableFile(CallbackMixin):
 
 
 class ResumableChunkState(Enum):
-    QUEUED = 0
+    PENDING = 0
     POPPED = 1
     UPLOADING = 2
     DONE = 3
@@ -155,7 +155,7 @@ class ResumableChunk(CallbackMixin):
         self.config = config
         self.file = file
         self.chunk = chunk
-        self.status = ResumableChunkState.QUEUED
+        self.status = ResumableChunkState.PENDING
         self.retries = 0
 
     def __eq__(self, other):
@@ -201,7 +201,7 @@ class ResumableChunk(CallbackMixin):
             self.send_signal(ResumableSignal.CHUNK_FAILED)
         else:
             self.retries += 1
-            self.status = ResumableChunkState.QUEUED
+            self.status = ResumableChunkState.PENDING
             self.send_signal(ResumableSignal.CHUNK_RETRY)
 
     def send_if_not_done(self):
