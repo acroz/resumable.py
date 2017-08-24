@@ -14,9 +14,11 @@ MB = 1024 * 1024
 
 
 class ResumableSignal(Enum):
-    CHUNK_COMPLETED = 0
-    FILE_ADDED = 1
-    FILE_COMPLETED = 2
+    FILE_ADDED = 0
+    FILE_COMPLETED = 1
+    CHUNK_COMPLETED = 2
+    CHUNK_RETRY = 3
+    CHUNK_FAILED = 4
 
 
 class Resumable(CallbackMixin):
@@ -142,6 +144,7 @@ class ResumableChunkState(Enum):
     POPPED = 1
     UPLOADING = 2
     DONE = 3
+    ERROR = 4
 
 
 class ResumableChunk(CallbackMixin):
