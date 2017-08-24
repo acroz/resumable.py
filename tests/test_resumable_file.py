@@ -75,8 +75,8 @@ def test_query():
 
 @pytest.mark.parametrize('chunk_statuses, completed', [
     ([ResumableChunkState.PENDING, ResumableChunkState.PENDING], False),
-    ([ResumableChunkState.DONE, ResumableChunkState.PENDING], False),
-    ([ResumableChunkState.DONE, ResumableChunkState.DONE], True),
+    ([ResumableChunkState.SUCCESS, ResumableChunkState.PENDING], False),
+    ([ResumableChunkState.SUCCESS, ResumableChunkState.SUCCESS], True),
     ([], True)
 ])
 def test_completed(chunk_statuses, completed):

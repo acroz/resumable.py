@@ -128,7 +128,7 @@ class ResumableFile(CallbackMixin):
     @property
     def completed(self):
         for chunk in self.chunks:
-            if chunk.status != ResumableChunkState.DONE:
+            if chunk.status != ResumableChunkState.SUCCESS:
                 return False
         else:
             return True
@@ -143,7 +143,7 @@ class ResumableChunkState(Enum):
     PENDING = 0
     POPPED = 1
     UPLOADING = 2
-    DONE = 3
+    SUCCESS = 3
     ERROR = 4
 
 
@@ -182,7 +182,7 @@ class ResumableChunk(CallbackMixin):
             data=self.query
         )
         if response.status_code == 200:
-            self.status = ResumableChunkState.DONE
+            self.status = ResumableChunkState.SUCCESS
             self.send_signal(ResumableSignal.CHUNK_COMPLETED)
 
     def send(self):
@@ -193,7 +193,7 @@ class ResumableChunk(CallbackMixin):
             files={'file': self.chunk.data}
         )
         if response.status_code in [200, 201]:
-            self.status = ResumableChunkState.DONE
+            self.status = ResumableChunkState.SUCCESS
             self.send_signal(ResumableSignal.CHUNK_COMPLETED)
         elif (response.status_code in self.config.permanent_errors or
               self.retries >= self.config.max_chunk_retries):
@@ -205,7 +205,7 @@ class ResumableChunk(CallbackMixin):
             self.send_signal(ResumableSignal.CHUNK_RETRY)
 
     def send_if_not_done(self):
-        if self.status != ResumableChunkState.DONE:
+        if self.status != ResumableChunkState.SUCCESS:
             self.send()
 
     def create_task(self):

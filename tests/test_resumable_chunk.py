@@ -20,7 +20,7 @@ def test_query():
 
 @pytest.mark.parametrize('status_code, status, signal', [
     (404, ResumableChunkState.PENDING, None),
-    (200, ResumableChunkState.DONE, ResumableSignal.CHUNK_COMPLETED)
+    (200, ResumableChunkState.SUCCESS, ResumableSignal.CHUNK_COMPLETED)
 ])
 def test_test(status_code, status, signal):
     mock_session = MagicMock(requests.Session)
@@ -45,7 +45,7 @@ def test_test(status_code, status, signal):
 
 
 @pytest.mark.parametrize('status_code, status, signal', [
-    (200, ResumableChunkState.DONE, ResumableSignal.CHUNK_COMPLETED),
+    (200, ResumableChunkState.SUCCESS, ResumableSignal.CHUNK_COMPLETED),
     (400, ResumableChunkState.ERROR, ResumableSignal.CHUNK_FAILED),
     (418, ResumableChunkState.PENDING, ResumableSignal.CHUNK_RETRY)
 ])
@@ -109,7 +109,7 @@ def test_retry():
 @pytest.mark.parametrize('status, should_send', [
     (ResumableChunkState.PENDING, True),
     (ResumableChunkState.POPPED, True),
-    (ResumableChunkState.DONE, False)
+    (ResumableChunkState.SUCCESS, False)
 ])
 def test_send_if_not_done(status, should_send):
     mock_send = MagicMock()

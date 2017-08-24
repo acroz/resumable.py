@@ -111,7 +111,7 @@ def test_chunks(session_mock, worker_pool_mock):
 
 def test_next_task(mocker, session_mock, worker_pool_mock):
     mock_chunks = [
-        Mock(status=ResumableChunkState.DONE),
+        Mock(status=ResumableChunkState.SUCCESS),
         Mock(status=ResumableChunkState.POPPED),
         Mock(status=ResumableChunkState.UPLOADING),
         Mock(status=ResumableChunkState.PENDING),
