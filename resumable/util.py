@@ -28,10 +28,10 @@ class Config(object):
             setattr(self, key, value)
 
     def __str__(self):
-        return '{}({})'.format(
+        return '{0}({1})'.format(
             self.__class__.__name__,
             ', '.join(
-                '{}={}'.format(k, repr(v)) for k, v in self.__dict__.items()
+                '{0}={1!r}'.format(k, v) for k, v in self.__dict__.items()
             )
         )
 
