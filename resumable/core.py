@@ -164,7 +164,8 @@ class ResumableChunk(CallbackMixin):
                 self.config == other.config and
                 self.file == other.file and
                 self.chunk == other.chunk and
-                self.state == other.state)
+                self.state == other.state and
+                self.retries == other.retries)
 
     @property
     def query(self):
@@ -200,6 +201,7 @@ class ResumableChunk(CallbackMixin):
             self.send_signal(ResumableSignal.CHUNK_FAILED)
         else:
             self.retries += 1
+            self.state = ResumableChunkState.QUEUED
             self.send_signal(ResumableSignal.CHUNK_RETRY)
 
     def send_if_not_done(self):
