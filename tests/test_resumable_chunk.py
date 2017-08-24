@@ -18,14 +18,14 @@ def test_query():
     }
 
 
-@pytest.mark.parametrize('get_response_code, expected_state', [
-    (404, ResumableChunkState.QUEUED),
-    (200, ResumableChunkState.DONE)
+@pytest.mark.parametrize('status_code, state, signal', [
+    (404, ResumableChunkState.QUEUED, None),
+    (200, ResumableChunkState.DONE, ResumableSignal.CHUNK_COMPLETED)
 ])
-def test_test(get_response_code, expected_state):
+def test_test(status_code, state, signal):
     mock_session = MagicMock(requests.Session)
     mock_session.get.return_value = Mock(requests.Response,
-                                         status_code=get_response_code)
+                                         status_code=status_code)
     mock_config = Config(target='mock-target')
     mock_query = {'query': 'foo'}
     mock_send_signal = MagicMock()
@@ -39,11 +39,9 @@ def test_test(get_response_code, expected_state):
         mock_config.target,
         data=mock_query
     )
-    assert chunk.state == expected_state
-    if expected_state == ResumableChunkState.DONE:
-        mock_send_signal.assert_called_once_with(
-            ResumableSignal.CHUNK_COMPLETED
-        )
+    assert chunk.state == state
+    if signal:
+        mock_send_signal.assert_called_once_with(signal)
 
 
 @pytest.mark.parametrize('status_code, state, signal', [
