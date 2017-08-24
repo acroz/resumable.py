@@ -48,7 +48,7 @@ def test_test(get_response_code, expected_state):
 
 def test_send():
     mock_session = MagicMock(requests.Session)
-    mock_session.post.return_value = Mock(requests.Response)
+    mock_session.post.return_value = Mock(requests.Response, status_code=200)
     mock_config = Config(target='mock-target')
     mock_query = {'query': 'foo'}
     mock_data = b'data'

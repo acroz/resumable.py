@@ -156,6 +156,7 @@ class ResumableChunk(CallbackMixin):
         self.file = file
         self.chunk = chunk
         self.state = ResumableChunkState.QUEUED
+        self.retries = 0
 
     def __eq__(self, other):
         return (isinstance(other, ResumableChunk) and
@@ -190,9 +191,16 @@ class ResumableChunk(CallbackMixin):
             data=self.query,
             files={'file': self.chunk.data}
         )
-        response.raise_for_status()
-        self.state = ResumableChunkState.DONE
-        self.send_signal(ResumableSignal.CHUNK_COMPLETED)
+        if response.status_code in [200, 201]:
+            self.state = ResumableChunkState.DONE
+            self.send_signal(ResumableSignal.CHUNK_COMPLETED)
+        elif (response.status_code in self.config.permanent_errors or
+              self.retries > self.config.max_chunk_retries):
+            self.state = ResumableChunkState.ERROR
+            self.send_signal(ResumableSignal.CHUNK_FAILED)
+        else:
+            self.retries += 1
+            self.send_signal(ResumableSignal.CHUNK_RETRY)
 
     def send_if_not_done(self):
         if self.state != ResumableChunkState.DONE:
