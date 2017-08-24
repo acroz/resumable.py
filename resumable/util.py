@@ -21,15 +21,19 @@ class CallbackMixin(object):
             target.send_signal(signal)
 
 
-class FixedUrlSession(object):
-    """A simple wrapper for requests.Session that fixes the URL."""
+class Config(object):
 
-    def __init__(self, session, url):
-        self.session = session
-        self.url = url
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
-    def get(self, *args, **kwargs):
-        return self.session.get(self.url, *args, **kwargs)
+    def __str__(self):
+        return '{0}({1})'.format(
+            self.__class__.__name__,
+            ', '.join(
+                '{0}={1!r}'.format(k, v) for k, v in self.__dict__.items()
+            )
+        )
 
-    def post(self, *args, **kwargs):
-        return self.session.post(self.url, *args, **kwargs)
+    def __eq__(self, other):
+        return isinstance(other, Config) and self.__dict__ == other.__dict__

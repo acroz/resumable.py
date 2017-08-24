@@ -2,6 +2,7 @@ import pytest
 from mock import Mock, MagicMock
 
 from resumable.core import Resumable, ResumableSignal, ResumableChunkState
+from resumable.util import Config
 
 
 MOCK_TARGET = 'https://example.com/upload'
@@ -21,12 +22,21 @@ def test_resumable(session_mock, worker_pool_mock):
     mock_sim_uploads = 5
     mock_chunk_size = 100
     mock_headers = {'header': 'foo'}
+    mock_max_chunk_retries = 100
+    mock_permanent_errors = [500]
 
     manager = Resumable(MOCK_TARGET, mock_sim_uploads, mock_chunk_size,
-                        mock_headers)
+                        mock_headers, mock_max_chunk_retries,
+                        mock_permanent_errors)
 
-    assert manager.target == MOCK_TARGET
-    assert manager.chunk_size == mock_chunk_size
+    assert manager.config == Config(
+        target=MOCK_TARGET,
+        simultaneous_uploads=mock_sim_uploads,
+        chunk_size=mock_chunk_size,
+        headers=mock_headers,
+        max_chunk_retries=mock_max_chunk_retries,
+        permanent_errors=mock_permanent_errors
+    )
 
     assert manager.session == session_mock.return_value
     manager.session.headers.update.assert_called_once_with(mock_headers)
@@ -50,8 +60,12 @@ def test_add_file(mocker, session_mock, worker_pool_mock):
 
     manager.add_file(mock_path)
 
-    lazy_load_file_mock.assert_called_once_with(mock_path, manager.chunk_size)
-    file_mock.assert_called_once_with(lazy_load_file_mock.return_value)
+    lazy_load_file_mock.assert_called_once_with(
+        mock_path, manager.config.chunk_size
+    )
+    file_mock.assert_called_once_with(
+        manager.session, manager.config, lazy_load_file_mock.return_value
+    )
     assert manager.files == [file_mock.return_value]
     manager.send_signal.assert_called_once_with(ResumableSignal.FILE_ADDED)
     file_mock.return_value.proxy_signals_to.assert_called_once_with(manager)
@@ -96,7 +110,6 @@ def test_chunks(session_mock, worker_pool_mock):
 
 
 def test_next_task(mocker, session_mock, worker_pool_mock):
-    fixed_url_session_mock = mocker.patch('resumable.core.FixedUrlSession')
     mock_chunks = [
         Mock(state=ResumableChunkState.DONE),
         Mock(state=ResumableChunkState.POPPED),
@@ -107,9 +120,3 @@ def test_next_task(mocker, session_mock, worker_pool_mock):
     mocker.patch.object(Resumable, 'chunks', mock_chunks)
     manager = Resumable(MOCK_TARGET)
     assert manager.next_task() == mock_chunks[3].create_task.return_value
-    mock_chunks[3].create_task.assert_called_once_with(
-        fixed_url_session_mock.return_value
-    )
-    fixed_url_session_mock.assert_called_once_with(
-        session_mock.return_value, MOCK_TARGET
-    )
