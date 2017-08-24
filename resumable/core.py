@@ -196,7 +196,7 @@ class ResumableChunk(CallbackMixin):
             self.state = ResumableChunkState.DONE
             self.send_signal(ResumableSignal.CHUNK_COMPLETED)
         elif (response.status_code in self.config.permanent_errors or
-              self.retries > self.config.max_chunk_retries):
+              self.retries >= self.config.max_chunk_retries):
             self.state = ResumableChunkState.ERROR
             self.send_signal(ResumableSignal.CHUNK_FAILED)
         else:
