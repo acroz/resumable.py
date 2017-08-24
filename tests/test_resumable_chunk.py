@@ -1,4 +1,4 @@
-from mock import Mock, MagicMock, patch
+from mock import Mock, MagicMock, patch, call
 import requests
 import pytest
 
@@ -73,6 +73,37 @@ def test_send(status_code, state, signal):
     )
     assert chunk.state == state
     mock_send_signal.assert_called_once_with(signal)
+
+
+def test_retry():
+    mock_session = MagicMock(requests.Session)
+    mock_session.post.return_value = Mock(requests.Response, status_code=418)
+    mock_config = Config(target='mock-target',
+                         max_chunk_retries=2,
+                         permanent_errors=[400])
+    mock_query = {'query': 'foo'}
+    mock_data = b'data'
+    mock_send_signal = MagicMock()
+
+    with patch.multiple(ResumableChunk, query=mock_query,
+                        send_signal=mock_send_signal):
+        chunk = ResumableChunk(mock_session, mock_config, Mock(),
+                               Mock(data=mock_data))
+
+        chunk.send()
+        assert chunk.state == ResumableChunkState.QUEUED
+
+        chunk.send()
+        assert chunk.state == ResumableChunkState.QUEUED
+
+        chunk.send()
+        assert chunk.state == ResumableChunkState.ERROR
+
+    mock_send_signal.assert_has_calls([
+        call(ResumableSignal.CHUNK_RETRY),
+        call(ResumableSignal.CHUNK_RETRY),
+        call(ResumableSignal.CHUNK_FAILED)
+    ])
 
 
 @pytest.mark.parametrize('state, should_send', [
