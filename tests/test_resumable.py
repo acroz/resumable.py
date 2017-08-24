@@ -23,16 +23,19 @@ def test_resumable(session_mock, worker_pool_mock):
     mock_chunk_size = 100
     mock_headers = {'header': 'foo'}
     mock_max_chunk_retries = 100
+    mock_permanent_errors = [500]
 
     manager = Resumable(MOCK_TARGET, mock_sim_uploads, mock_chunk_size,
-                        mock_headers, mock_max_chunk_retries)
+                        mock_headers, mock_max_chunk_retries,
+                        mock_permanent_errors)
 
     assert manager.config == Config(
         target=MOCK_TARGET,
         simultaneous_uploads=mock_sim_uploads,
         chunk_size=mock_chunk_size,
         headers=mock_headers,
-        max_chunk_retries=mock_max_chunk_retries
+        max_chunk_retries=mock_max_chunk_retries,
+        permanent_errors=mock_permanent_errors
     )
 
     assert manager.session == session_mock.return_value

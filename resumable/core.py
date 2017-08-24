@@ -22,7 +22,8 @@ class ResumableSignal(Enum):
 class Resumable(CallbackMixin):
 
     def __init__(self, target, simultaneous_uploads=3, chunk_size=MB,
-                 headers=None, max_chunk_retries=100):
+                 headers=None, max_chunk_retries=100,
+                 permanent_errors=[400, 404, 415, 500, 501]):
         super(Resumable, self).__init__()
 
         self.config = Config(
@@ -30,7 +31,8 @@ class Resumable(CallbackMixin):
             headers=headers,
             simultaneous_uploads=simultaneous_uploads,
             chunk_size=chunk_size,
-            max_chunk_retries=max_chunk_retries
+            max_chunk_retries=max_chunk_retries,
+            permanent_errors=permanent_errors
         )
 
         self.session = requests.Session()
