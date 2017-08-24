@@ -46,10 +46,18 @@ def test_test(get_response_code, expected_state):
         )
 
 
-def test_send():
+@pytest.mark.parametrize('status_code, state, signal', [
+    (200, ResumableChunkState.DONE, ResumableSignal.CHUNK_COMPLETED),
+    (400, ResumableChunkState.ERROR, ResumableSignal.CHUNK_FAILED),
+    (418, ResumableChunkState.QUEUED, ResumableSignal.CHUNK_RETRY)
+])
+def test_send(status_code, state, signal):
     mock_session = MagicMock(requests.Session)
-    mock_session.post.return_value = Mock(requests.Response, status_code=200)
-    mock_config = Config(target='mock-target')
+    mock_session.post.return_value = Mock(requests.Response,
+                                          status_code=status_code)
+    mock_config = Config(target='mock-target',
+                         max_chunk_retries=100,
+                         permanent_errors=[400])
     mock_query = {'query': 'foo'}
     mock_data = b'data'
     mock_send_signal = MagicMock()
@@ -65,8 +73,8 @@ def test_send():
         data=mock_query,
         files={'file': mock_data}
     )
-    assert chunk.state == ResumableChunkState.DONE
-    mock_send_signal.assert_called_once_with(ResumableSignal.CHUNK_COMPLETED)
+    assert chunk.state == state
+    mock_send_signal.assert_called_once_with(signal)
 
 
 @pytest.mark.parametrize('state, should_send', [
