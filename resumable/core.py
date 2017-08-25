@@ -214,13 +214,6 @@ class ResumableChunk(CallbackMixin):
         if self.status != ResumableChunkState.SUCCESS:
             self.send()
 
-    def send_if_not_done(self):
-        if self.status != ResumableChunkState.SUCCESS:
-            self.send()
-
     def create_task(self):
-        def task():
-            self.test()
-            self.send_if_not_done()
         self.status = ResumableChunkState.POPPED
-        return task
+        return self.resolve

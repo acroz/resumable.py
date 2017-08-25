@@ -140,35 +140,11 @@ def test_resolve_no_test():
     chunk.send.assert_called_once()
 
 
-@pytest.mark.parametrize('status, should_send', [
-    (ResumableChunkState.PENDING, True),
-    (ResumableChunkState.POPPED, True),
-    (ResumableChunkState.SUCCESS, False)
-])
-def test_send_if_not_done(status, should_send):
-    mock_send = MagicMock()
-
-    with patch.multiple(ResumableChunk, send=mock_send):
-        chunk = ResumableChunk(Mock(), Mock(), Mock(), Mock())
-        chunk.status = status
-        chunk.send_if_not_done()
-
-    if should_send:
-        mock_send.assert_called_once()
-    else:
-        mock_send.assert_not_called()
-
-
 def test_create_task():
-    mock_test = MagicMock()
-    mock_send_if_not_done = MagicMock()
+    chunk = ResumableChunk(Mock(), Mock(), Mock(), Mock())
+    chunk.resolve = MagicMock()
 
-    with patch.multiple(ResumableChunk, test=mock_test,
-                        send_if_not_done=mock_send_if_not_done):
-        chunk = ResumableChunk(Mock(), Mock(), Mock(), Mock())
-        task = chunk.create_task()
-        assert chunk.status == ResumableChunkState.POPPED
-        task()
+    task = chunk.create_task()
 
-    mock_test.assert_called_once()
-    mock_send_if_not_done.assert_called_once()
+    assert chunk.status == ResumableChunkState.POPPED
+    assert task == chunk.resolve
