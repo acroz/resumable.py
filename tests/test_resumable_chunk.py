@@ -106,35 +106,45 @@ def test_retry():
     ])
 
 
-@pytest.mark.parametrize('status, should_send', [
-    (ResumableChunkState.PENDING, True),
-    (ResumableChunkState.POPPED, True),
-    (ResumableChunkState.SUCCESS, False)
-])
-def test_send_if_not_done(status, should_send):
-    mock_send = MagicMock()
+@pytest.mark.parametrize('test_success', [True, False])
+def test_resolve_with_test(test_success):
+    mock_config = Config(test_chunks=True)
 
-    with patch.multiple(ResumableChunk, send=mock_send):
-        chunk = ResumableChunk(Mock(), Mock(), Mock(), Mock())
-        chunk.status = status
-        chunk.send_if_not_done()
+    chunk = ResumableChunk(Mock(), mock_config, Mock(), Mock())
 
-    if should_send:
-        mock_send.assert_called_once()
+    def set_status():
+        if test_success:
+            chunk.status = ResumableChunkState.SUCCESS
+    chunk.test = MagicMock(side_effect=set_status)
+    chunk.send = MagicMock()
+
+    chunk.resolve()
+
+    chunk.test.assert_called_once()
+    if test_success:
+        chunk.send.assert_not_called()
     else:
-        mock_send.assert_not_called()
+        chunk.send.assert_called_once()
+
+
+def test_resolve_no_test():
+    mock_config = Config(test_chunks=False)
+
+    chunk = ResumableChunk(Mock(), mock_config, Mock(), Mock())
+    chunk.test = MagicMock()
+    chunk.send = MagicMock()
+
+    chunk.resolve()
+
+    chunk.test.assert_not_called()
+    chunk.send.assert_called_once()
 
 
 def test_create_task():
-    mock_test = MagicMock()
-    mock_send_if_not_done = MagicMock()
+    chunk = ResumableChunk(Mock(), Mock(), Mock(), Mock())
+    chunk.resolve = MagicMock()
 
-    with patch.multiple(ResumableChunk, test=mock_test,
-                        send_if_not_done=mock_send_if_not_done):
-        chunk = ResumableChunk(Mock(), Mock(), Mock(), Mock())
-        task = chunk.create_task()
-        assert chunk.status == ResumableChunkState.POPPED
-        task()
+    task = chunk.create_task()
 
-    mock_test.assert_called_once()
-    mock_send_if_not_done.assert_called_once()
+    assert chunk.status == ResumableChunkState.POPPED
+    assert task == chunk.resolve

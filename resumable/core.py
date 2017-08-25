@@ -25,7 +25,7 @@ class Resumable(CallbackMixin):
 
     def __init__(self, target, simultaneous_uploads=3, chunk_size=MB,
                  headers=None, max_chunk_retries=100,
-                 permanent_errors=[400, 404, 415, 500, 501]):
+                 permanent_errors=[400, 404, 415, 500, 501], test_chunks=True):
         super(Resumable, self).__init__()
 
         self.config = Config(
@@ -34,7 +34,8 @@ class Resumable(CallbackMixin):
             simultaneous_uploads=simultaneous_uploads,
             chunk_size=chunk_size,
             max_chunk_retries=max_chunk_retries,
-            permanent_errors=permanent_errors
+            permanent_errors=permanent_errors,
+            test_chunks=test_chunks
         )
 
         self.session = requests.Session()
@@ -156,6 +157,7 @@ class ResumableChunk(CallbackMixin):
         self.file = file
         self.chunk = chunk
         self.status = ResumableChunkState.PENDING
+        self.tested = False
         self.retries = 0
 
     def __eq__(self, other):
@@ -165,6 +167,7 @@ class ResumableChunk(CallbackMixin):
                 self.file == other.file and
                 self.chunk == other.chunk and
                 self.status == other.status and
+                self.tested == other.tested and
                 self.retries == other.retries)
 
     @property
@@ -184,6 +187,7 @@ class ResumableChunk(CallbackMixin):
         if response.status_code == 200:
             self.status = ResumableChunkState.SUCCESS
             self.send_signal(ResumableSignal.CHUNK_COMPLETED)
+        self.tested = True
 
     def send(self):
         self.status = ResumableChunkState.UPLOADING
@@ -204,13 +208,12 @@ class ResumableChunk(CallbackMixin):
             self.status = ResumableChunkState.PENDING
             self.send_signal(ResumableSignal.CHUNK_RETRY)
 
-    def send_if_not_done(self):
+    def resolve(self):
+        if self.config.test_chunks and not self.tested:
+            self.test()
         if self.status != ResumableChunkState.SUCCESS:
             self.send()
 
     def create_task(self):
-        def task():
-            self.test()
-            self.send_if_not_done()
         self.status = ResumableChunkState.POPPED
-        return task
+        return self.resolve
