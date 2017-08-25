@@ -106,6 +106,40 @@ def test_retry():
     ])
 
 
+@pytest.mark.parametrize('test_success', [True, False])
+def test_resolve_with_test(test_success):
+    mock_config = Config(test_chunks=True)
+
+    chunk = ResumableChunk(Mock(), mock_config, Mock(), Mock())
+
+    def set_status():
+        if test_success:
+            chunk.status = ResumableChunkState.SUCCESS
+    chunk.test = MagicMock(side_effect=set_status)
+    chunk.send = MagicMock()
+
+    chunk.resolve()
+
+    chunk.test.assert_called_once()
+    if test_success:
+        chunk.send.assert_not_called()
+    else:
+        chunk.send.assert_called_once()
+
+
+def test_resolve_no_test():
+    mock_config = Config(test_chunks=False)
+
+    chunk = ResumableChunk(Mock(), mock_config, Mock(), Mock())
+    chunk.test = MagicMock()
+    chunk.send = MagicMock()
+
+    chunk.resolve()
+
+    chunk.test.assert_not_called()
+    chunk.send.assert_called_once()
+
+
 @pytest.mark.parametrize('status, should_send', [
     (ResumableChunkState.PENDING, True),
     (ResumableChunkState.POPPED, True),
