@@ -98,6 +98,8 @@ def test_worker_pool():
     pool = ResumableWorkerPool(2, get_task)
     pool.join()
     get_task.assert_all_tasks_called()
+    for thread in pool.workers:
+        assert not thread.is_alive()
 
 
 def test_worker_pool_concurrency():
