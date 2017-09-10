@@ -55,6 +55,7 @@ class Resumable(CallbackMixin):
         self.files.append(file)
         self.send_signal(ResumableSignal.FILE_ADDED)
         file.proxy_signals_to(self)
+        return file
 
     def wait_until_complete(self):
         self.worker_pool.join()
