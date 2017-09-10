@@ -26,7 +26,7 @@ def _run_server(queue, port):
 
     @app.route('/upload', methods=['GET', 'POST'])
     def upload():
-        form_first_fields = {(k, v) for k, v in flask.request.form.items()}
+        form_first_fields = set(flask.request.form.items())
         queue.put(Request(flask.request.method, form_first_fields))
         if flask.request.method == 'GET':
             return '', 404

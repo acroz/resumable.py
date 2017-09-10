@@ -17,7 +17,7 @@ def expected_body(identifier, testfile, index, content):
         'resumableRelativePath': testfile,
         'resumableTotalChunks': len(SAMPLE_CONTENT_CHUNKS)
     }
-    return {(k, str(v)) for k, v in body.items()}
+    return set([(k, str(v)) for k, v in body.items()])
 
 
 def expected_requests(resumable_file, testfile):
