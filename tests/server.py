@@ -48,11 +48,11 @@ class Server(object):
     def url(self):
         if self.port is None:
             raise RuntimeError('server not started yet')
-        return 'http://localhost:{}'.format(self.port)
+        return 'http://localhost:{0}'.format(self.port)
 
     @property
     def endpoint(self):
-        return '{}/upload'.format(self.url)
+        return '{0}/upload'.format(self.url)
 
     @property
     def received(self):
