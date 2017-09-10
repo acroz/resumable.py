@@ -67,7 +67,7 @@ def test_query():
         'resumableTotalSize': mock_lazy_load_file.size,
         'resumableType': file.type,
         'resumableIdentifier': str(file.unique_identifier),
-        'resumableFileName': os.path.basename(mock_lazy_load_file.path),
+        'resumableFilename': os.path.basename(mock_lazy_load_file.path),
         'resumableRelativePath': mock_lazy_load_file.path,
         'resumableTotalChunks': len(file.chunks)
     }

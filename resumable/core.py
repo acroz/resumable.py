@@ -122,7 +122,7 @@ class ResumableFile(CallbackMixin):
             'resumableTotalSize': self.file.size,
             'resumableType': self.type,
             'resumableIdentifier': str(self.unique_identifier),
-            'resumableFileName': os.path.basename(self.file.path),
+            'resumableFilename': os.path.basename(self.file.path),
             'resumableRelativePath': self.file.path,
             'resumableTotalChunks': len(self.chunks)
         }
