@@ -2,5 +2,6 @@ __pycache__/
 *.egg-info/
 .eggs/
 .cache/
+.mypy_cache/
 .coverage
 htmlcov/
