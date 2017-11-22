@@ -37,6 +37,7 @@ def _run_server(queue, port):
 
 
 class Server(object):
+    """Run a test server in a separate process."""
 
     def __init__(self):
         self.process = None
