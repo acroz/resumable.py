@@ -4,7 +4,7 @@ from six.moves import builtins
 
 import resumable.file
 from resumable.file import LazyLoadChunkableFile
-from tests.util import (  # noqa: F401
+from tests.fixture import (  # noqa: F401
     SAMPLE_CONTENT, TEST_CHUNK_SIZE, SAMPLE_CONTENT_CHUNKS, sample_file
 )
 
