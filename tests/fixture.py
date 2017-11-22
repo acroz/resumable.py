@@ -6,7 +6,6 @@ from collections import namedtuple
 import pytest
 import requests
 import flask
-import pytest
 
 
 SAMPLE_CONTENT = b'sample content afsdfas'
