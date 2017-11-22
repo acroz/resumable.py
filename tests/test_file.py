@@ -1,5 +1,5 @@
 import pytest
-from mock import Mock, MagicMock, call
+from mock import Mock, call
 from six.moves import builtins
 
 import resumable.file
@@ -11,15 +11,15 @@ from tests.fixture import (  # noqa: F401
 
 @pytest.fixture
 def mock_lock(monkeypatch):
-    lock = Mock(__enter__=MagicMock(), __exit__=MagicMock())
+    lock = Mock(__enter__=Mock(), __exit__=Mock())
     monkeypatch.setattr(resumable.file, 'Lock', Mock(return_value=lock))
     return lock
 
 
 @pytest.fixture
 def mock_open(monkeypatch):
-    file = Mock(seek=MagicMock(), read=MagicMock(), close=MagicMock())
-    open = MagicMock(return_value=file)
+    file = Mock(seek=Mock(), read=Mock(), close=Mock())
+    open = Mock(return_value=file)
     monkeypatch.setattr(builtins, 'open', open)
     return open
 
