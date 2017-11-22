@@ -1,6 +1,7 @@
 from resumable import Resumable
+
 from tests.server import server, Request
-from tests.util import (
+from tests.util import (  # noqa: F401
     SAMPLE_CONTENT, TEST_CHUNK_SIZE, SAMPLE_CONTENT_CHUNKS, sample_file
 )
 
@@ -30,7 +31,7 @@ def expected_requests(resumable_file, testfile):
     return all_requests
 
 
-def test_resumable(server, sample_file):
+def test_resumable(server, sample_file):  # noqa: F811
     with Resumable(simultaneous_uploads=1,
                    target=server.endpoint,
                    chunk_size=TEST_CHUNK_SIZE) as r:

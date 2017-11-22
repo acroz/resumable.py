@@ -4,7 +4,7 @@ from six.moves import builtins
 
 import resumable.file
 from resumable.file import LazyLoadChunkableFile
-from tests.util import (
+from tests.util import (  # noqa: F401
     SAMPLE_CONTENT, TEST_CHUNK_SIZE, SAMPLE_CONTENT_CHUNKS, sample_file
 )
 
@@ -24,25 +24,25 @@ def mock_open(monkeypatch):
     return open
 
 
-def test_file(sample_file):
+def test_file(sample_file):  # noqa: F811
     file = LazyLoadChunkableFile(sample_file, TEST_CHUNK_SIZE)
     assert file.path == sample_file
     assert file.chunk_size == TEST_CHUNK_SIZE
     assert file.size == len(SAMPLE_CONTENT)
 
 
-def test_close(sample_file, mock_open):
+def test_close(sample_file, mock_open):  # noqa: F811
     file = LazyLoadChunkableFile(sample_file, TEST_CHUNK_SIZE)
     file.close()
     mock_open.return_value.close.assert_called_once()
 
 
-def test_read_bytes(sample_file):
+def test_read_bytes(sample_file):  # noqa: F811
     file = LazyLoadChunkableFile(sample_file, TEST_CHUNK_SIZE)
     assert file.read_bytes(2, 10) == SAMPLE_CONTENT[2:12]
 
 
-def test_read_bytes_lock(sample_file, mock_lock, mock_open):
+def test_read_bytes_lock(sample_file, mock_lock, mock_open):  # noqa: F811
 
     # Collect all lock and file related calls together
     manager = Mock(
@@ -66,7 +66,7 @@ def test_read_bytes_lock(sample_file, mock_lock, mock_open):
     ]
 
 
-def test_chunking(sample_file):
+def test_chunking(sample_file):  # noqa: F811
     file = LazyLoadChunkableFile(sample_file, TEST_CHUNK_SIZE)
     assert len(list(file.chunks)) == len(SAMPLE_CONTENT_CHUNKS)
     for chunk, expected_data in zip(file.chunks, SAMPLE_CONTENT_CHUNKS):
