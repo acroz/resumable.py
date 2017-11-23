@@ -119,7 +119,7 @@ class ResumableFile(CallbackMixin):
     @property
     def completed(self):
         for chunk in self.chunks:
-            if chunk.status != ResumableChunkState.SUCCESS:
+            if not chunk.done:
                 return False
         else:
             return True
@@ -130,14 +130,6 @@ class ResumableFile(CallbackMixin):
             self.close()
 
 
-class ResumableChunkState(Enum):
-    PENDING = 0
-    POPPED = 1
-    UPLOADING = 2
-    SUCCESS = 3
-    ERROR = 4
-
-
 class ResumableChunk(CallbackMixin):
 
     def __init__(self, session, config, file, chunk):
@@ -146,9 +138,7 @@ class ResumableChunk(CallbackMixin):
         self.config = config
         self.file = file
         self.chunk = chunk
-        self.status = ResumableChunkState.PENDING
-        self.tested = False
-        self.retries = 0
+        self.done = False
 
     def __eq__(self, other):
         return (isinstance(other, ResumableChunk) and
@@ -156,9 +146,7 @@ class ResumableChunk(CallbackMixin):
                 self.config == other.config and
                 self.file == other.file and
                 self.chunk == other.chunk and
-                self.status == other.status and
-                self.tested == other.tested and
-                self.retries == other.retries)
+                self.done == other.done)
 
     @property
     def query(self):
@@ -174,33 +162,25 @@ class ResumableChunk(CallbackMixin):
             self.config.target,
             data=self.query
         )
-        if response.status_code == 200:
-            self.status = ResumableChunkState.SUCCESS
-            self.send_signal(ResumableSignal.CHUNK_COMPLETED)
-        self.tested = True
+        return response.status_code == 200
 
     def send(self):
-        self.status = ResumableChunkState.UPLOADING
         response = self.session.post(
             self.config.target,
             data=self.query,
             files={'file': self.chunk.data}
         )
-        if response.status_code in [200, 201]:
-            self.status = ResumableChunkState.SUCCESS
-            self.send_signal(ResumableSignal.CHUNK_COMPLETED)
-        elif (response.status_code in self.config.permanent_errors or
-              self.retries >= self.config.max_chunk_retries):
-            self.status = ResumableChunkState.ERROR
-            self.send_signal(ResumableSignal.CHUNK_FAILED)
-        else:
-            self.retries += 1
-            self.status = ResumableChunkState.PENDING
-            self.send_signal(ResumableSignal.CHUNK_RETRY)
+        if response.status_code in self.config.permanent_errors:
+            # TODO: better exception
+            raise RuntimeError('permanent error')
+        return response.status_code in [200, 201]
 
     def resolve(self):
-        if self.config.test_chunks and not self.tested:
-            self.test()
-        while self.status not in [ResumableChunkState.SUCCESS,
-                                  ResumableChunkState.ERROR]:
-            self.send()
+        if self.config.test_chunks and self.test():
+            return
+        tries = 0
+        while not self.send():
+            tries += 1
+            if tries >= self.config.max_chunk_retries:
+                raise RuntimeError('max retries exceeded')
+        self.done = True
