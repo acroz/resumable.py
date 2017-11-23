@@ -55,6 +55,7 @@ class Resumable(CallbackMixin):
         self.files.append(file)
         self.send_signal(ResumableSignal.FILE_ADDED)
         file.proxy_signals_to(self)
+        return file
 
     def wait_until_complete(self):
         self.worker_pool.join()
@@ -121,7 +122,7 @@ class ResumableFile(CallbackMixin):
             'resumableTotalSize': self.file.size,
             'resumableType': self.type,
             'resumableIdentifier': str(self.unique_identifier),
-            'resumableFileName': os.path.basename(self.file.path),
+            'resumableFilename': os.path.basename(self.file.path),
             'resumableRelativePath': self.file.path,
             'resumableTotalChunks': len(self.chunks)
         }

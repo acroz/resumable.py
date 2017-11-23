@@ -21,7 +21,8 @@ setup(
         'pytest-cov',
         'six',
         'mock',
-        'pytest-mock'
+        'pytest-mock',
+        'flask'
     ],
     install_requires=[
         'enum34',

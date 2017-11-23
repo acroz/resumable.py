@@ -1,14 +1,14 @@
 import time
 from threading import Event
 
-from mock import MagicMock
+from mock import Mock
 
 from resumable.worker import (
     ResumableWorkerPool, ResumableWorker, NEXT_TASK_LOCK
 )
 
 
-class GetTaskMock(MagicMock):
+class GetTaskMock(Mock):
 
     def __init__(self, tasks=None, next_task_block=None):
         super(GetTaskMock, self).__init__(side_effect=self.next_task)
@@ -40,7 +40,7 @@ class GetTaskMock(MagicMock):
 
 
 def test_worker():
-    get_task = GetTaskMock([MagicMock(), MagicMock()])
+    get_task = GetTaskMock([Mock(), Mock()])
     worker = ResumableWorker(get_task, poll=False)
     worker.start()
     worker.join()
@@ -48,7 +48,7 @@ def test_worker():
 
 
 def test_worker_polling():
-    get_task = GetTaskMock([MagicMock(), MagicMock()])
+    get_task = GetTaskMock([Mock(), Mock()])
     worker = ResumableWorker(get_task, poll=True)
     worker.start()
 
@@ -56,8 +56,8 @@ def test_worker_polling():
     assert worker.is_alive()
     get_task.assert_all_tasks_called()
 
-    get_task.append_task(MagicMock())
-    get_task.append_task(MagicMock())
+    get_task.append_task(Mock())
+    get_task.append_task(Mock())
     worker.poll = False
     worker.join()
     get_task.assert_all_tasks_called()
@@ -66,7 +66,7 @@ def test_worker_polling():
 def test_worker_acquires_next_task_lock():
     next_task_block = Event()
 
-    get_task = GetTaskMock([MagicMock(), MagicMock()], next_task_block)
+    get_task = GetTaskMock([Mock(), Mock()], next_task_block)
     worker = ResumableWorker(get_task, poll=False)
     worker.start()
     worker.join(timeout=0.1)
@@ -80,7 +80,7 @@ def test_worker_acquires_next_task_lock():
 
 
 def test_worker_respects_next_task_lock():
-    get_task = GetTaskMock([MagicMock(), MagicMock()])
+    get_task = GetTaskMock([Mock(), Mock()])
     worker = ResumableWorker(get_task, poll=False)
 
     NEXT_TASK_LOCK.acquire()
@@ -94,15 +94,17 @@ def test_worker_respects_next_task_lock():
 
 
 def test_worker_pool():
-    get_task = GetTaskMock([MagicMock() for _ in range(5)])
+    get_task = GetTaskMock([Mock() for _ in range(5)])
     pool = ResumableWorkerPool(2, get_task)
     pool.join()
     get_task.assert_all_tasks_called()
+    for thread in pool.workers:
+        assert not thread.is_alive()
 
 
 def test_worker_pool_concurrency():
     get_task = GetTaskMock(
-        [MagicMock(side_effect=lambda: time.sleep(0.1)) for _ in range(5)]
+        [Mock(side_effect=lambda: time.sleep(0.1)) for _ in range(5)]
     )
     start = time.time()
     pool = ResumableWorkerPool(5, get_task)

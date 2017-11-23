@@ -1,4 +1,4 @@
-from mock import Mock, MagicMock
+from mock import Mock
 
 from resumable.util import CallbackMixin
 from resumable.core import ResumableSignal
@@ -20,8 +20,8 @@ def test_proxy_callbacks_to():
 
 
 def test_send_signal():
-    mock_callback = MagicMock()
-    mock_proxy_target = MagicMock(CallbackMixin)
+    mock_callback = Mock()
+    mock_proxy_target = Mock(CallbackMixin)
     test_signal = ResumableSignal.CHUNK_COMPLETED
 
     obj = CallbackMixin()

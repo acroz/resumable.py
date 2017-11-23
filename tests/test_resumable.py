@@ -1,5 +1,5 @@
 import pytest
-from mock import Mock, MagicMock
+from mock import Mock
 
 from resumable.core import Resumable, ResumableSignal, ResumableChunkState
 from resumable.util import Config
@@ -58,7 +58,7 @@ def test_add_file(mocker, session_mock, worker_pool_mock):
     mock_path = '/mock/path'
 
     manager = Resumable(MOCK_TARGET)
-    manager.send_signal = MagicMock()
+    manager.send_signal = Mock()
 
     manager.add_file(mock_path)
 
@@ -81,7 +81,7 @@ def test_wait_until_complete(session_mock, worker_pool_mock):
 
 def test_close(session_mock, worker_pool_mock):
     manager = Resumable(MOCK_TARGET)
-    manager.files = [MagicMock(), MagicMock(), MagicMock()]
+    manager.files = [Mock(), Mock(), Mock()]
     manager.close()
 
     # TODO: should also ensure worker pool is closed
@@ -91,8 +91,8 @@ def test_close(session_mock, worker_pool_mock):
 
 def test_context_manager(session_mock, worker_pool_mock):
     manager = Resumable(MOCK_TARGET)
-    manager.wait_until_complete = MagicMock()
-    manager.close = MagicMock()
+    manager.wait_until_complete = Mock()
+    manager.close = Mock()
 
     with manager as entered_manager:
         assert manager == entered_manager

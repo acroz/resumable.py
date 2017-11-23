@@ -1,6 +1,6 @@
 import os
 
-from mock import Mock, MagicMock, call
+from mock import Mock, call
 import pytest
 
 from resumable.core import (
@@ -35,20 +35,22 @@ def test_file(mocker):
 
 
 def test_close():
-    mock_lazy_load_file = MagicMock(LazyLoadChunkableFile)
+    mock_lazy_load_file = Mock(LazyLoadChunkableFile, chunks=[])
     file = ResumableFile(Mock(), Mock(), mock_lazy_load_file)
     file.close()
     mock_lazy_load_file.close.assert_called_once()
 
 
 def test_type(mocker):
-    mock_lazy_load_file = MagicMock(LazyLoadChunkableFile, path='file.txt')
+    mock_lazy_load_file = Mock(LazyLoadChunkableFile,
+                               path='file.txt', chunks=[])
     file = ResumableFile(Mock(), Mock(), mock_lazy_load_file)
     assert file.type == 'text/plain'
 
 
 def test_type_unrecognised(mocker):
-    mock_lazy_load_file = MagicMock(LazyLoadChunkableFile, path='unknown')
+    mock_lazy_load_file = Mock(LazyLoadChunkableFile,
+                               path='no-extension', chunks=[])
     file = ResumableFile(Mock(), Mock(), mock_lazy_load_file)
     assert file.type == ''
 
@@ -67,7 +69,7 @@ def test_query():
         'resumableTotalSize': mock_lazy_load_file.size,
         'resumableType': file.type,
         'resumableIdentifier': str(file.unique_identifier),
-        'resumableFileName': os.path.basename(mock_lazy_load_file.path),
+        'resumableFilename': os.path.basename(mock_lazy_load_file.path),
         'resumableRelativePath': mock_lazy_load_file.path,
         'resumableTotalChunks': len(file.chunks)
     }
@@ -92,9 +94,9 @@ def test_completed(chunk_statuses, completed):
 def test_handle_chunk_completion(mocker, file_completed):
     mocker.patch.object(ResumableFile, 'completed', file_completed)
 
-    mock_lazy_load_file = MagicMock(LazyLoadChunkableFile)
+    mock_lazy_load_file = Mock(LazyLoadChunkableFile, chunks=[])
     file = ResumableFile(Mock(), Mock(), mock_lazy_load_file)
-    file.send_signal = MagicMock()
+    file.send_signal = Mock()
 
     file.handle_chunk_completion()
 

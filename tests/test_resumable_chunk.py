@@ -1,4 +1,4 @@
-from mock import Mock, MagicMock, patch, call
+from mock import Mock, patch, call
 import requests
 import pytest
 
@@ -23,12 +23,12 @@ def test_query():
     (200, ResumableChunkState.SUCCESS, ResumableSignal.CHUNK_COMPLETED)
 ])
 def test_test(status_code, status, signal):
-    mock_session = MagicMock(requests.Session)
+    mock_session = Mock(requests.Session)
     mock_session.get.return_value = Mock(requests.Response,
                                          status_code=status_code)
     mock_config = Config(target='mock-target')
     mock_query = {'query': 'foo'}
-    mock_send_signal = MagicMock()
+    mock_send_signal = Mock()
 
     with patch.multiple(ResumableChunk, query=mock_query,
                         send_signal=mock_send_signal):
@@ -50,7 +50,7 @@ def test_test(status_code, status, signal):
     (418, ResumableChunkState.PENDING, ResumableSignal.CHUNK_RETRY)
 ])
 def test_send(status_code, status, signal):
-    mock_session = MagicMock(requests.Session)
+    mock_session = Mock(requests.Session)
     mock_session.post.return_value = Mock(requests.Response,
                                           status_code=status_code)
     mock_config = Config(target='mock-target',
@@ -58,7 +58,7 @@ def test_send(status_code, status, signal):
                          permanent_errors=[400])
     mock_query = {'query': 'foo'}
     mock_data = b'data'
-    mock_send_signal = MagicMock()
+    mock_send_signal = Mock()
 
     with patch.multiple(ResumableChunk, query=mock_query,
                         send_signal=mock_send_signal):
@@ -76,14 +76,14 @@ def test_send(status_code, status, signal):
 
 
 def test_retry():
-    mock_session = MagicMock(requests.Session)
+    mock_session = Mock(requests.Session)
     mock_session.post.return_value = Mock(requests.Response, status_code=418)
     mock_config = Config(target='mock-target',
                          max_chunk_retries=2,
                          permanent_errors=[400])
     mock_query = {'query': 'foo'}
     mock_data = b'data'
-    mock_send_signal = MagicMock()
+    mock_send_signal = Mock()
 
     with patch.multiple(ResumableChunk, query=mock_query,
                         send_signal=mock_send_signal):
@@ -115,8 +115,8 @@ def test_resolve_with_test(test_success):
     def set_status():
         if test_success:
             chunk.status = ResumableChunkState.SUCCESS
-    chunk.test = MagicMock(side_effect=set_status)
-    chunk.send = MagicMock()
+    chunk.test = Mock(side_effect=set_status)
+    chunk.send = Mock()
 
     chunk.resolve()
 
@@ -131,8 +131,8 @@ def test_resolve_no_test():
     mock_config = Config(test_chunks=False)
 
     chunk = ResumableChunk(Mock(), mock_config, Mock(), Mock())
-    chunk.test = MagicMock()
-    chunk.send = MagicMock()
+    chunk.test = Mock()
+    chunk.send = Mock()
 
     chunk.resolve()
 
@@ -142,7 +142,7 @@ def test_resolve_no_test():
 
 def test_create_task():
     chunk = ResumableChunk(Mock(), Mock(), Mock(), Mock())
-    chunk.resolve = MagicMock()
+    chunk.resolve = Mock()
 
     task = chunk.create_task()
 
