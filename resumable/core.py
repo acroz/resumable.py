@@ -2,11 +2,11 @@ import os
 from enum import Enum
 import uuid
 import mimetypes
+from concurrent.futures import ThreadPoolExecutor
 
 import requests
 
 from resumable.file import LazyLoadChunkableFile
-from resumable.worker import ResumableWorkerPool
 from resumable.util import CallbackMixin, Config
 
 
@@ -46,8 +46,7 @@ class Resumable(CallbackMixin):
 
         self.files = []
 
-        self.worker_pool = ResumableWorkerPool(simultaneous_uploads,
-                                               self.next_task)
+        self.executor = ThreadPoolExecutor(simultaneous_uploads)
 
     def add_file(self, path):
         lazy_load_file = LazyLoadChunkableFile(path, self.config.chunk_size)
@@ -55,10 +54,11 @@ class Resumable(CallbackMixin):
         self.files.append(file)
         self.send_signal(ResumableSignal.FILE_ADDED)
         file.proxy_signals_to(self)
-        return file
 
-    def wait_until_complete(self):
-        self.worker_pool.join()
+        for chunk in file.chunks:
+            self.executor.submit(chunk.resolve)
+
+        return file
 
     def close(self):
         for file in self.files:
@@ -68,19 +68,8 @@ class Resumable(CallbackMixin):
         return self
 
     def __exit__(self, *args):
-        self.wait_until_complete()
+        self.executor.shutdown()
         self.close()
-
-    @property
-    def chunks(self):
-        for file in self.files:
-            for chunk in file.chunks:
-                yield chunk
-
-    def next_task(self):
-        for chunk in self.chunks:
-            if chunk.status == ResumableChunkState.PENDING:
-                return chunk.create_task()
 
 
 class ResumableFile(CallbackMixin):
@@ -212,9 +201,6 @@ class ResumableChunk(CallbackMixin):
     def resolve(self):
         if self.config.test_chunks and not self.tested:
             self.test()
-        if self.status != ResumableChunkState.SUCCESS:
+        while self.status not in [ResumableChunkState.SUCCESS,
+                                  ResumableChunkState.ERROR]:
             self.send()
-
-    def create_task(self):
-        self.status = ResumableChunkState.POPPED
-        return self.resolve
