@@ -1,11 +1,10 @@
 import os
-import uuid
 import mimetypes
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 
-from resumable.file import LazyLoadChunkableFile
+from resumable.file import ResumableFile
 from resumable.util import CallbackDispatcher, Config
 
 
@@ -44,14 +43,13 @@ class Resumable(object):
         self.file_completed = CallbackDispatcher()
 
     def add_file(self, path):
-        lazy_load_file = LazyLoadChunkableFile(path, self.config.chunk_size)
-        file = ResumableFile(lazy_load_file)
+        file = ResumableFile(path, self.config.chunk_size)
         self.files.append(file)
 
         self.file_added.trigger(file)
         file.completed.register(lambda: self.file_completed.trigger(file))
 
-        for chunk in lazy_load_file.chunks:
+        for chunk in file.chunks:
             future = self.executor.submit(
                 _resolve_chunk,
                 self.session, self.config, file, chunk
@@ -89,52 +87,27 @@ class Resumable(object):
             self.close()
 
 
-class ResumableFile(object):
-
-    def __init__(self, file):
-        super(ResumableFile, self).__init__()
-
-        self.file = file
-        self.unique_identifier = uuid.uuid4()
-
-        self.chunk_done = {chunk: False for chunk in self.file.chunks}
-
-        self.completed = CallbackDispatcher()
-
-    def close(self):
-        self.file.close()
-
-    @property
-    def is_completed(self):
-        return all(self.chunk_done.values())
-
-    def handle_chunk_completion(self):
-        if self.is_completed:
-            self.completed.trigger()
-            self.close()
-
-
-def _file_type(file):
+def _file_type(path):
     """Mimic the type parameter of a JS File object.
 
     Resumable.js uses the File object's type attribute to guess mime type,
     which is guessed from file extention accoring to
     https://developer.mozilla.org/en-US/docs/Web/API/File/type.
     """
-    type_, _ = mimetypes.guess_type(file.file.path)
+    type_, _ = mimetypes.guess_type(path)
     # When no type can be inferred, File.type returns an empty string
     return '' if type_ is None else type_
 
 
 def _build_query(file, chunk):
     return {
-        'resumableChunkSize': file.file.chunk_size,
-        'resumableTotalSize': file.file.size,
-        'resumableType': _file_type(file),
+        'resumableChunkSize': file.chunk_size,
+        'resumableTotalSize': file.size,
+        'resumableType': _file_type(file.path),
         'resumableIdentifier': str(file.unique_identifier),
-        'resumableFilename': os.path.basename(file.file.path),
-        'resumableRelativePath': file.file.path,
-        'resumableTotalChunks': len(file.file.chunks),
+        'resumableFilename': os.path.basename(file.path),
+        'resumableRelativePath': file.path,
+        'resumableTotalChunks': len(file.chunks),
         'resumableChunkNumber': chunk.index + 1,
         'resumableCurrentChunkSize': chunk.size
     }
