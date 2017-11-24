@@ -11,9 +11,6 @@ class CallbackMixin(object):
     def register_callback(self, signal, callback):
         self.signal_callbacks[signal].append(callback)
 
-    def proxy_signals_to(self, target):
-        self.signal_proxy_targets.append(target)
-
     def send_signal(self, signal):
         for callback in self.signal_callbacks[signal]:
             callback()

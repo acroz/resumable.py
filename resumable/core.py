@@ -53,7 +53,6 @@ class Resumable(CallbackMixin):
         file = ResumableFile(lazy_load_file)
         self.files.append(file)
         self.send_signal(ResumableSignal.FILE_ADDED)
-        file.proxy_signals_to(self)
 
         for chunk in lazy_load_file.chunks:
             self.executor.submit(
