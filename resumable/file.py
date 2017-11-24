@@ -13,6 +13,8 @@ class LazyLoadChunkableFile(object):
         self._fp = open(self.path, 'rb')
         self._fp_lock = Lock()
 
+        self._chunks = None
+
     def close(self):
         self._fp.close()
 
@@ -23,13 +25,18 @@ class LazyLoadChunkableFile(object):
 
     @property
     def chunks(self):
+        if self._chunks is not None:
+            return self._chunks
+        self._chunks = []
         index = 0
         start = 0
         while start < self.size:
             end = min(start + self.chunk_size, self.size)
-            yield LazyLoadFileChunk(self, index, start, end - start)
+            chunk = LazyLoadFileChunk(self, index, start, end - start)
+            self._chunks.append(chunk)
             index += 1
             start += self.chunk_size
+        return self._chunks
 
 
 class LazyLoadFileChunk(object):

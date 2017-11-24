@@ -50,12 +50,12 @@ class Resumable(CallbackMixin):
 
     def add_file(self, path):
         lazy_load_file = LazyLoadChunkableFile(path, self.config.chunk_size)
-        file = ResumableFile(self.session, self.config, lazy_load_file)
+        file = ResumableFile(lazy_load_file)
         self.files.append(file)
         self.send_signal(ResumableSignal.FILE_ADDED)
         file.proxy_signals_to(self)
 
-        for chunk in file.chunks:
+        for chunk in lazy_load_file.chunks:
             self.executor.submit(
                 _resolve_chunk,
                 self.session, self.config, file, chunk
@@ -75,14 +75,14 @@ class Resumable(CallbackMixin):
         self.close()
 
 
-def _file_type(self):
+def _file_type(file):
     """Mimic the type parameter of a JS File object.
 
     Resumable.js uses the File object's type attribute to guess mime type,
     which is guessed from file extention accoring to
     https://developer.mozilla.org/en-US/docs/Web/API/File/type.
     """
-    type_, _ = mimetypes.guess_type(self.file.path)
+    type_, _ = mimetypes.guess_type(file.file.path)
     # When no type can be inferred, File.type returns an empty string
     return '' if type_ is None else type_
 
@@ -95,9 +95,9 @@ def _build_query(file, chunk):
         'resumableIdentifier': str(file.unique_identifier),
         'resumableFilename': os.path.basename(file.file.path),
         'resumableRelativePath': file.file.path,
-        'resumableTotalChunks': len(file.chunks),
-        'resumableChunkNumber': chunk.chunk.index + 1,
-        'resumableCurrentChunkSize': chunk.chunk.size
+        'resumableTotalChunks': len(file.file.chunks),
+        'resumableChunkNumber': chunk.index + 1,
+        'resumableCurrentChunkSize': chunk.size
     }
 
 
@@ -113,7 +113,7 @@ def _send_chunk(session, config, file, chunk):
     response = session.post(
         config.target,
         data=_build_query(file, chunk),
-        files={'file': chunk.chunk.data}
+        files={'file': chunk.data}
     )
     if response.status_code in config.permanent_errors:
         # TODO: better exception
@@ -129,51 +129,27 @@ def _resolve_chunk(session, config, file, chunk):
         tries += 1
         if tries >= config.max_chunk_retries:
             raise RuntimeError('max retries exceeded')
-    chunk.done = True
+    file.chunk_done[chunk] = True
 
 
 class ResumableFile(CallbackMixin):
 
-    def __init__(self, session, config, file):
+    def __init__(self, file):
         super(ResumableFile, self).__init__()
 
-        self.config = config
         self.file = file
         self.unique_identifier = uuid.uuid4()
 
-        self.chunks = [ResumableChunk(chunk)
-                       for chunk in self.file.chunks]
-
-        for chunk in self.chunks:
-            chunk.proxy_signals_to(self)
-            chunk.register_callback(ResumableSignal.CHUNK_COMPLETED,
-                                    self.handle_chunk_completion)
+        self.chunk_done = {chunk: False for chunk in self.file.chunks}
 
     def close(self):
         self.file.close()
 
     @property
     def completed(self):
-        for chunk in self.chunks:
-            if not chunk.done:
-                return False
-        else:
-            return True
+        return all(self.chunk_done.values())
 
     def handle_chunk_completion(self):
         if self.completed:
             self.send_signal(ResumableSignal.FILE_COMPLETED)
             self.close()
-
-
-class ResumableChunk(CallbackMixin):
-
-    def __init__(self, chunk):
-        super(ResumableChunk, self).__init__()
-        self.chunk = chunk
-        self.done = False
-
-    def __eq__(self, other):
-        return (isinstance(other, ResumableChunk) and
-                self.chunk == other.chunk and
-                self.done == other.done)
