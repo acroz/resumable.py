@@ -70,6 +70,31 @@ class Resumable(object):
         self.close()
 
 
+class ResumableFile(object):
+
+    def __init__(self, file):
+        super(ResumableFile, self).__init__()
+
+        self.file = file
+        self.unique_identifier = uuid.uuid4()
+
+        self.chunk_done = {chunk: False for chunk in self.file.chunks}
+
+        self.completed = CallbackDispatcher()
+
+    def close(self):
+        self.file.close()
+
+    @property
+    def is_completed(self):
+        return all(self.chunk_done.values())
+
+    def handle_chunk_completion(self):
+        if self.is_completed:
+            self.completed.trigger()
+            self.close()
+
+
 def _file_type(file):
     """Mimic the type parameter of a JS File object.
 
@@ -125,28 +150,3 @@ def _resolve_chunk(session, config, file, chunk):
         if tries >= config.max_chunk_retries:
             raise RuntimeError('max retries exceeded')
     file.chunk_done[chunk] = True
-
-
-class ResumableFile(object):
-
-    def __init__(self, file):
-        super(ResumableFile, self).__init__()
-
-        self.file = file
-        self.unique_identifier = uuid.uuid4()
-
-        self.chunk_done = {chunk: False for chunk in self.file.chunks}
-
-        self.completed = CallbackDispatcher()
-
-    def close(self):
-        self.file.close()
-
-    @property
-    def is_completed(self):
-        return all(self.chunk_done.values())
-
-    def handle_chunk_completion(self):
-        if self.is_completed:
-            self.completed.trigger()
-            self.close()
