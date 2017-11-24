@@ -25,7 +25,6 @@ setup(
         'flask'
     ],
     install_requires=[
-        'enum34',
         'requests',
         'futures'
     ]
