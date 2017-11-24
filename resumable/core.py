@@ -1,7 +1,7 @@
 import os
 import uuid
 import mimetypes
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 
@@ -38,6 +38,7 @@ class Resumable(object):
         self.files = []
 
         self.executor = ThreadPoolExecutor(simultaneous_uploads)
+        self.futures = []
 
         self.file_added = CallbackDispatcher()
         self.file_completed = CallbackDispatcher()
@@ -51,12 +52,24 @@ class Resumable(object):
         file.completed.register(lambda: self.file_completed.trigger(file))
 
         for chunk in lazy_load_file.chunks:
-            self.executor.submit(
+            future = self.executor.submit(
                 _resolve_chunk,
                 self.session, self.config, file, chunk
             )
+            self.futures.append(future)
 
         return file
+
+    def join(self):
+        """Wait until all current uploads are completed."""
+        for future in as_completed(self.futures):
+            if future.exception():
+                raise future.exception()
+
+    def _cancel_remaining_futures(self):
+        for future in self.futures:
+            if not future.done():
+                future.cancel()
 
     def close(self):
         for file in self.files:
@@ -66,8 +79,14 @@ class Resumable(object):
         return self
 
     def __exit__(self, *args):
-        self.executor.shutdown()
-        self.close()
+        try:
+            self.join()
+        except:  # noqa: E722
+            self._cancel_remaining_futures()
+            raise
+        finally:
+            self.executor.shutdown()
+            self.close()
 
 
 class ResumableFile(object):
