@@ -133,7 +133,7 @@ def _send_chunk(session, config, file, chunk):
     response = session.post(
         config.target,
         data=_build_query(file, chunk),
-        files={'file': chunk.data}
+        files={'file': chunk.load()}
     )
     if response.status_code in config.permanent_errors:
         # TODO: better exception
