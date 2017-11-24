@@ -1,5 +1,4 @@
 import os
-from enum import Enum
 import uuid
 import mimetypes
 from concurrent.futures import ThreadPoolExecutor
@@ -7,21 +6,13 @@ from concurrent.futures import ThreadPoolExecutor
 import requests
 
 from resumable.file import LazyLoadChunkableFile
-from resumable.util import CallbackMixin, Config
+from resumable.util import CallbackDispatcher, Config
 
 
 MB = 1024 * 1024
 
 
-class ResumableSignal(Enum):
-    FILE_ADDED = 0
-    FILE_COMPLETED = 1
-    CHUNK_COMPLETED = 2
-    CHUNK_RETRY = 3
-    CHUNK_FAILED = 4
-
-
-class Resumable(CallbackMixin):
+class Resumable(object):
 
     def __init__(self, target, simultaneous_uploads=3, chunk_size=MB,
                  headers=None, max_chunk_retries=100,
@@ -48,11 +39,16 @@ class Resumable(CallbackMixin):
 
         self.executor = ThreadPoolExecutor(simultaneous_uploads)
 
+        self.file_added = CallbackDispatcher()
+        self.file_completed = CallbackDispatcher()
+
     def add_file(self, path):
         lazy_load_file = LazyLoadChunkableFile(path, self.config.chunk_size)
         file = ResumableFile(lazy_load_file)
         self.files.append(file)
-        self.send_signal(ResumableSignal.FILE_ADDED)
+
+        self.file_added.trigger(file)
+        file.completed.register(lambda: self.file_completed.trigger(file))
 
         for chunk in lazy_load_file.chunks:
             self.executor.submit(
@@ -131,7 +127,7 @@ def _resolve_chunk(session, config, file, chunk):
     file.chunk_done[chunk] = True
 
 
-class ResumableFile(CallbackMixin):
+class ResumableFile(object):
 
     def __init__(self, file):
         super(ResumableFile, self).__init__()
@@ -141,14 +137,16 @@ class ResumableFile(CallbackMixin):
 
         self.chunk_done = {chunk: False for chunk in self.file.chunks}
 
+        self.completed = CallbackDispatcher()
+
     def close(self):
         self.file.close()
 
     @property
-    def completed(self):
+    def is_completed(self):
         return all(self.chunk_done.values())
 
     def handle_chunk_completion(self):
-        if self.completed:
-            self.send_signal(ResumableSignal.FILE_COMPLETED)
+        if self.is_completed:
+            self.completed.trigger()
             self.close()

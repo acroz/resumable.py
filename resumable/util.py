@@ -1,21 +1,14 @@
-from collections import defaultdict
+class CallbackDispatcher(object):
 
+    def __init__(self):
+        self.targets = []
 
-class CallbackMixin(object):
+    def register(self, callback):
+        self.targets.append(callback)
 
-    def __init__(self, *args, **kwargs):
-        super(CallbackMixin, self).__init__(*args, **kwargs)
-        self.signal_callbacks = defaultdict(list)
-        self.signal_proxy_targets = []
-
-    def register_callback(self, signal, callback):
-        self.signal_callbacks[signal].append(callback)
-
-    def send_signal(self, signal):
-        for callback in self.signal_callbacks[signal]:
-            callback()
-        for target in self.signal_proxy_targets:
-            target.send_signal(signal)
+    def trigger(self, *args, **kwargs):
+        for callback in self.targets:
+            callback(*args, **kwargs)
 
 
 class Config(object):
