@@ -3,7 +3,7 @@ from threading import Lock
 from collections import namedtuple
 
 
-FileChunk = namedtuple('FileChunk', ['index', 'size', 'load'])
+FileChunk = namedtuple('FileChunk', ['index', 'size', 'read'])
 
 
 class LazyLoadChunkableFile(object):
