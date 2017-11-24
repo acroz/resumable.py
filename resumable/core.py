@@ -56,7 +56,10 @@ class Resumable(CallbackMixin):
         file.proxy_signals_to(self)
 
         for chunk in file.chunks:
-            self.executor.submit(chunk.resolve)
+            self.executor.submit(
+                _resolve_chunk,
+                self.session, self.config, file, chunk
+            )
 
         return file
 
@@ -72,6 +75,63 @@ class Resumable(CallbackMixin):
         self.close()
 
 
+def _file_type(self):
+    """Mimic the type parameter of a JS File object.
+
+    Resumable.js uses the File object's type attribute to guess mime type,
+    which is guessed from file extention accoring to
+    https://developer.mozilla.org/en-US/docs/Web/API/File/type.
+    """
+    type_, _ = mimetypes.guess_type(self.file.path)
+    # When no type can be inferred, File.type returns an empty string
+    return '' if type_ is None else type_
+
+
+def _build_query(file, chunk):
+    return {
+        'resumableChunkSize': file.file.chunk_size,
+        'resumableTotalSize': file.file.size,
+        'resumableType': _file_type(file),
+        'resumableIdentifier': str(file.unique_identifier),
+        'resumableFilename': os.path.basename(file.file.path),
+        'resumableRelativePath': file.file.path,
+        'resumableTotalChunks': len(file.chunks),
+        'resumableChunkNumber': chunk.chunk.index + 1,
+        'resumableCurrentChunkSize': chunk.chunk.size
+    }
+
+
+def _test_chunk(session, config, file, chunk):
+    response = session.get(
+        config.target,
+        data=_build_query(file, chunk)
+    )
+    return response.status_code == 200
+
+
+def _send_chunk(session, config, file, chunk):
+    response = session.post(
+        config.target,
+        data=_build_query(file, chunk),
+        files={'file': chunk.chunk.data}
+    )
+    if response.status_code in config.permanent_errors:
+        # TODO: better exception
+        raise RuntimeError('permanent error')
+    return response.status_code in [200, 201]
+
+
+def _resolve_chunk(session, config, file, chunk):
+    if config.test_chunks and _test_chunk(session, config, file, chunk):
+        return
+    tries = 0
+    while not _send_chunk(session, config, file, chunk):
+        tries += 1
+        if tries >= config.max_chunk_retries:
+            raise RuntimeError('max retries exceeded')
+    chunk.done = True
+
+
 class ResumableFile(CallbackMixin):
 
     def __init__(self, session, config, file):
@@ -81,7 +141,7 @@ class ResumableFile(CallbackMixin):
         self.file = file
         self.unique_identifier = uuid.uuid4()
 
-        self.chunks = [ResumableChunk(session, self.config, self, chunk)
+        self.chunks = [ResumableChunk(chunk)
                        for chunk in self.file.chunks]
 
         for chunk in self.chunks:
@@ -91,30 +151,6 @@ class ResumableFile(CallbackMixin):
 
     def close(self):
         self.file.close()
-
-    @property
-    def type(self):
-        """Mimic the type parameter of a JS File object.
-
-        Resumable.js uses the File object's type attribute to guess mime type,
-        which is guessed from file extention accoring to
-        https://developer.mozilla.org/en-US/docs/Web/API/File/type.
-        """
-        type_, _ = mimetypes.guess_type(self.file.path)
-        # When no type can be inferred, File.type returns an empty string
-        return '' if type_ is None else type_
-
-    @property
-    def query(self):
-        return {
-            'resumableChunkSize': self.file.chunk_size,
-            'resumableTotalSize': self.file.size,
-            'resumableType': self.type,
-            'resumableIdentifier': str(self.unique_identifier),
-            'resumableFilename': os.path.basename(self.file.path),
-            'resumableRelativePath': self.file.path,
-            'resumableTotalChunks': len(self.chunks)
-        }
 
     @property
     def completed(self):
@@ -132,55 +168,12 @@ class ResumableFile(CallbackMixin):
 
 class ResumableChunk(CallbackMixin):
 
-    def __init__(self, session, config, file, chunk):
+    def __init__(self, chunk):
         super(ResumableChunk, self).__init__()
-        self.session = session
-        self.config = config
-        self.file = file
         self.chunk = chunk
         self.done = False
 
     def __eq__(self, other):
         return (isinstance(other, ResumableChunk) and
-                self.session == other.session and
-                self.config == other.config and
-                self.file == other.file and
                 self.chunk == other.chunk and
                 self.done == other.done)
-
-    @property
-    def query(self):
-        query = {
-            'resumableChunkNumber': self.chunk.index + 1,
-            'resumableCurrentChunkSize': self.chunk.size
-        }
-        query.update(self.file.query)
-        return query
-
-    def test(self):
-        response = self.session.get(
-            self.config.target,
-            data=self.query
-        )
-        return response.status_code == 200
-
-    def send(self):
-        response = self.session.post(
-            self.config.target,
-            data=self.query,
-            files={'file': self.chunk.data}
-        )
-        if response.status_code in self.config.permanent_errors:
-            # TODO: better exception
-            raise RuntimeError('permanent error')
-        return response.status_code in [200, 201]
-
-    def resolve(self):
-        if self.config.test_chunks and self.test():
-            return
-        tries = 0
-        while not self.send():
-            tries += 1
-            if tries >= self.config.max_chunk_retries:
-                raise RuntimeError('max retries exceeded')
-        self.done = True
