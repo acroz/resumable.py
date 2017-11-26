@@ -2,6 +2,7 @@ import os
 import uuid
 from threading import Lock
 from collections import namedtuple
+from functools import partial
 
 from resumable.util import CallbackDispatcher
 
@@ -20,7 +21,7 @@ def build_chunks(read_bytes, file_size, chunk_size):
         end = min(start + chunk_size, file_size)
         size = end - start
 
-        chunk = FileChunk(index, size, lambda: read_bytes(start, size))
+        chunk = FileChunk(index, size, partial(read_bytes, start, size))
         chunks.append(chunk)
 
         index += 1
