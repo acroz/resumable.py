@@ -8,6 +8,21 @@ from tests.fixture import (  # noqa: F401
 )
 
 
+@pytest.fixture
+def mock_lock(mocker):
+    lock = MagicMock()
+    mocker.patch('resumable.file.Lock', Mock(return_value=lock))
+    return lock
+
+
+@pytest.fixture
+def mock_open(mocker):
+    file = Mock(seek=Mock(), read=Mock(), close=Mock())
+    open = Mock(return_value=file)
+    mocker.patch('resumable.file.open', open)
+    return open
+
+
 def test_build_chunks(sample_file):  # noqa: F811
 
     read_bytes = Mock()
@@ -36,24 +51,30 @@ def test_build_chunks(sample_file):  # noqa: F811
     read_bytes.assert_called_once_with(200, 33)
 
 
+def test_file(mocker, sample_file):  # noqa: F811
+    mock_build_chunks = mocker.patch('resumable.file.build_chunks')
+
+    file = ResumableFile(sample_file, TEST_CHUNK_SIZE)
+
+    assert file.path == sample_file
+    assert file.chunk_size == TEST_CHUNK_SIZE
+    assert file.size == len(SAMPLE_CONTENT)
+    assert file.chunks == mock_build_chunks.return_value
+
+    mock_build_chunks.assert_called_once_with(
+        file._read_bytes, len(SAMPLE_CONTENT), TEST_CHUNK_SIZE
+    )
+
+
+def test_close(sample_file, mock_open):  # noqa: F811
+    file = ResumableFile(sample_file, TEST_CHUNK_SIZE)
+    file.close()
+    mock_open.return_value.close.assert_called_once()
+
+
 def test_read_bytes(sample_file):  # noqa: F811
     file = ResumableFile(sample_file, TEST_CHUNK_SIZE)
     assert file._read_bytes(2, 10) == SAMPLE_CONTENT[2:12]
-
-
-@pytest.fixture
-def mock_lock(mocker):
-    lock = MagicMock()
-    mocker.patch('resumable.file.Lock', Mock(return_value=lock))
-    return lock
-
-
-@pytest.fixture
-def mock_open(mocker):
-    file = Mock(seek=Mock(), read=Mock(), close=Mock())
-    open = Mock(return_value=file)
-    mocker.patch('resumable.file.open', open)
-    return open
 
 
 def test_read_bytes_lock(sample_file, mock_lock, mock_open):  # noqa: F811
