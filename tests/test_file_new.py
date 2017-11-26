@@ -1,5 +1,8 @@
-from mock import Mock
-from resumable.file import FileChunk, build_chunks
+from mock import Mock, MagicMock, call
+
+import pytest
+
+from resumable.file import ResumableFile, build_chunks
 from tests.fixture import (  # noqa: F401
     SAMPLE_CONTENT, TEST_CHUNK_SIZE, SAMPLE_CONTENT_CHUNKS, sample_file
 )
@@ -31,3 +34,47 @@ def test_build_chunks(sample_file):  # noqa: F811
     assert chunks[2].size == 33
     chunks[2].read()
     read_bytes.assert_called_once_with(200, 33)
+
+
+def test_read_bytes(sample_file):  # noqa: F811
+    file = ResumableFile(sample_file, TEST_CHUNK_SIZE)
+    assert file._read_bytes(2, 10) == SAMPLE_CONTENT[2:12]
+
+
+@pytest.fixture
+def mock_lock(mocker):
+    lock = MagicMock()
+    mocker.patch('resumable.file.Lock', Mock(return_value=lock))
+    return lock
+
+
+@pytest.fixture
+def mock_open(mocker):
+    file = Mock(seek=Mock(), read=Mock(), close=Mock())
+    open = Mock(return_value=file)
+    mocker.patch('resumable.file.open', open)
+    return open
+
+
+def test_read_bytes_lock(sample_file, mock_lock, mock_open):  # noqa: F811
+
+    # Collect all lock and file related calls together
+    manager = Mock(
+        lock=mock_lock,
+        open=mock_open,
+        file=mock_open.return_value
+    )
+
+    # Creating a file should cause the file to be opened in rb mode
+    file = ResumableFile(sample_file, TEST_CHUNK_SIZE)
+    assert manager.mock_calls == [call.open(sample_file, 'rb')]
+    manager.reset_mock()
+
+    # Reading bytes from the file should happen in the contect of the lock
+    file._read_bytes(2, 10)
+    assert manager.mock_calls == [
+        call.lock.__enter__(),
+        call.file.seek(2),
+        call.file.read(10),
+        call.lock.__exit__(None, None, None)
+    ]
