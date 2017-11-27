@@ -1,4 +1,4 @@
-from mock import Mock
+from mock import Mock, call
 import pytest
 
 from resumable.util import Config
@@ -10,6 +10,7 @@ TEST_TARGET = 'http://example.com/upload'
 TEST_PATH = '/path/to/file.txt'
 TEST_CHUNK_SIZE = 100
 TEST_FILE_SIZE = 123
+MOCK_CHUNK_DATA = 'foo ' * 25
 
 
 def mock_session(test_status=404, send_status=200):
@@ -32,6 +33,12 @@ def mock_file():
     )
 
 
+def mock_chunk():
+    return FileChunk(
+        index=0, size=100, read=Mock(return_value=MOCK_CHUNK_DATA)
+    )
+
+
 def expected_form_data():
     return {
         'resumableChunkSize': TEST_CHUNK_SIZE,
@@ -46,6 +53,19 @@ def expected_form_data():
     }
 
 
+def assert_get(session):
+    session.get.assert_called_once_with(
+        TEST_TARGET, data=expected_form_data()
+    )
+
+
+def assert_post(session, times=1):
+    single_call = call(
+        TEST_TARGET, data=expected_form_data(), files={'file': MOCK_CHUNK_DATA}
+    )
+    session.post.assert_has_calls([single_call] * times)
+
+
 @pytest.mark.parametrize('test_status', [404, 500])
 def test_resolve_chunk(test_status):
 
@@ -54,19 +74,12 @@ def test_resolve_chunk(test_status):
         target=TEST_TARGET, test_chunks=True, permanent_errors=[500]
     )
     file = mock_file()
-    chunk = FileChunk(index=0, size=100, read=Mock())
+    chunk = mock_chunk()
 
     resolve_chunk(session, config, file, chunk)
 
-    session.get.assert_called_once_with(
-        TEST_TARGET,
-        data=expected_form_data()
-    )
-    session.post.assert_called_once_with(
-        TEST_TARGET,
-        data=expected_form_data(),
-        files={'file': chunk.read.return_value}
-    )
+    assert_get(session)
+    assert_post(session)
     file.mark_chunk_completed.assert_called_once_with(chunk)
 
 
@@ -77,14 +90,11 @@ def test_resolve_chunk_exists():
         target=TEST_TARGET, test_chunks=True, permanent_errors=[500]
     )
     file = mock_file()
-    chunk = FileChunk(index=0, size=100, read=Mock())
+    chunk = mock_chunk()
 
     resolve_chunk(session, config, file, chunk)
 
-    session.get.assert_called_once_with(
-        TEST_TARGET,
-        data=expected_form_data()
-    )
+    assert_get(session)
     session.post.assert_not_called()
     file.mark_chunk_completed.assert_called_once_with(chunk)
 
@@ -96,16 +106,12 @@ def test_resolve_chunk_no_test():
         target=TEST_TARGET, test_chunks=False, permanent_errors=[500]
     )
     file = mock_file()
-    chunk = FileChunk(index=0, size=100, read=Mock())
+    chunk = mock_chunk()
 
     resolve_chunk(session, config, file, chunk)
 
     session.get.assert_not_called()
-    session.post.assert_called_once_with(
-        TEST_TARGET,
-        data=expected_form_data(),
-        files={'file': chunk.read.return_value}
-    )
+    assert_post(session)
     file.mark_chunk_completed.assert_called_once_with(chunk)
 
 
@@ -116,20 +122,13 @@ def test_resolve_chunk_send_permanent_error():
         target=TEST_TARGET, test_chunks=True, permanent_errors=[500]
     )
     file = mock_file()
-    chunk = FileChunk(index=0, size=100, read=Mock())
+    chunk = mock_chunk()
 
     with pytest.raises(ResumableError):
         resolve_chunk(session, config, file, chunk)
 
-    session.get.assert_called_once_with(
-        TEST_TARGET,
-        data=expected_form_data()
-    )
-    session.post.assert_called_once_with(
-        TEST_TARGET,
-        data=expected_form_data(),
-        files={'file': chunk.read.return_value}
-    )
+    assert_get(session)
+    assert_post(session)
     file.mark_chunk_completed.assert_not_called()
 
 
@@ -141,19 +140,11 @@ def test_resolve_chunk_send_exceed_max_retries():
         max_chunk_retries=10
     )
     file = mock_file()
-    chunk = FileChunk(index=0, size=100, read=Mock())
+    chunk = mock_chunk()
 
     with pytest.raises(ResumableError):
         resolve_chunk(session, config, file, chunk)
 
-    session.get.assert_called_once_with(
-        TEST_TARGET,
-        data=expected_form_data()
-    )
-    assert session.post.call_count == 10
-    session.post.assert_called_with(
-        TEST_TARGET,
-        data=expected_form_data(),
-        files={'file': chunk.read.return_value}
-    )
+    assert_get(session)
+    assert_post(session, times=10)
     file.mark_chunk_completed.assert_not_called()
