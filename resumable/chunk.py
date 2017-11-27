@@ -3,14 +3,19 @@ import mimetypes
 
 
 def resolve_chunk(session, config, file, chunk):
-    if config.test_chunks and _test_chunk(session, config, file, chunk):
-        return
-    tries = 0
-    while not _send_chunk(session, config, file, chunk):
-        tries += 1
-        if tries >= config.max_chunk_retries:
-            raise RuntimeError('max retries exceeded')
-    file.chunk_done[chunk] = True
+
+    exists_on_server = False
+    if config.test_chunks:
+        exists_on_server = _test_chunk(session, config, file, chunk)
+
+    if not exists_on_server:
+        tries = 0
+        while not _send_chunk(session, config, file, chunk):
+            tries += 1
+            if tries >= config.max_chunk_retries:
+                raise RuntimeError('max retries exceeded')
+
+    file.mark_chunk_completed(chunk)
 
 
 def _test_chunk(session, config, file, chunk):

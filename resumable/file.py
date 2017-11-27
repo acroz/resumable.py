@@ -43,7 +43,7 @@ class ResumableFile(object):
         self._fp_lock = Lock()
 
         self.chunks = build_chunks(self._read_bytes, self.size, chunk_size)
-        self.chunk_done = {chunk: False for chunk in self.chunks}
+        self._chunk_done = {chunk: False for chunk in self.chunks}
 
         self.completed = CallbackDispatcher()
 
@@ -57,9 +57,10 @@ class ResumableFile(object):
 
     @property
     def is_completed(self):
-        return all(self.chunk_done.values())
+        return all(self._chunk_done.values())
 
-    def handle_chunk_completion(self):
+    def mark_chunk_completed(self, chunk):
+        self._chunk_done[chunk] = True
         if self.is_completed:
             self.completed.trigger()
             self.close()
