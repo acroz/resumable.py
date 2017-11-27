@@ -1,7 +1,7 @@
 from mock import Mock, call
 import pytest
 
-from resumable.core import Resumable, _resolve_chunk
+from resumable.core import Resumable, resolve_chunk
 from resumable.util import Config
 
 
@@ -64,9 +64,9 @@ def test_add_file(mocker, session_mock, executor_mock):
     file_mock.assert_called_once_with(mock_path, mock_chunk_size)
     assert manager.files == [file_mock.return_value]
     executor_mock.return_value.submit.assert_has_calls([
-        call(_resolve_chunk, session_mock.return_value, manager.config,
+        call(resolve_chunk, session_mock.return_value, manager.config,
              file_mock.return_value, 'foo'),
-        call(_resolve_chunk, session_mock.return_value, manager.config,
+        call(resolve_chunk, session_mock.return_value, manager.config,
              file_mock.return_value, 'bar')
     ])
 
