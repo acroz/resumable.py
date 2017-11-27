@@ -69,10 +69,6 @@ class Resumable(object):
             if not future.done():
                 future.cancel()
 
-    def close(self):
-        for file in self.files:
-            file.close()
-
     def __enter__(self):
         return self
 
@@ -84,7 +80,8 @@ class Resumable(object):
             raise
         finally:
             self.executor.shutdown()
-            self.close()
+            for file in self.files:
+                file.close()
 
 
 def _file_type(path):

@@ -1,7 +1,7 @@
+from mock import Mock, call
 import pytest
-from mock import Mock
 
-from resumable.core import Resumable, ResumableSignal, ResumableChunkState
+from resumable.core import Resumable, _resolve_chunk
 from resumable.util import Config
 
 
@@ -14,11 +14,12 @@ def session_mock(mocker):
 
 
 @pytest.fixture
-def worker_pool_mock(mocker):
-    return mocker.patch('resumable.core.ResumableWorkerPool')
+def executor_mock(mocker):
+    return mocker.patch('resumable.core.ThreadPoolExecutor')
 
 
-def test_resumable(session_mock, worker_pool_mock):
+def test_resumable(session_mock, executor_mock):
+
     mock_sim_uploads = 5
     mock_chunk_size = 100
     mock_headers = {'header': 'foo'}
@@ -45,80 +46,42 @@ def test_resumable(session_mock, worker_pool_mock):
 
     assert manager.files == []
 
-    assert manager.worker_pool == worker_pool_mock.return_value
-    worker_pool_mock.assert_called_once_with(
-        mock_sim_uploads, manager.next_task
-    )
+    assert manager.executor == executor_mock.return_value
+    executor_mock.assert_called_once_with(mock_sim_uploads)
 
 
-def test_add_file(mocker, session_mock, worker_pool_mock):
-    lazy_load_file_mock = mocker.patch('resumable.core.LazyLoadChunkableFile')
-    file_mock = mocker.patch('resumable.core.ResumableFile')
+def test_add_file(mocker, session_mock, executor_mock):
+
+    file_mock = mocker.patch('resumable.core.ResumableFile',
+                             return_value=Mock(chunks=['foo', 'bar']))
 
     mock_path = '/mock/path'
+    mock_chunk_size = 100
 
-    manager = Resumable(MOCK_TARGET)
-    manager.send_signal = Mock()
-
+    manager = Resumable(MOCK_TARGET, chunk_size=mock_chunk_size)
     manager.add_file(mock_path)
 
-    lazy_load_file_mock.assert_called_once_with(
-        mock_path, manager.config.chunk_size
-    )
-    file_mock.assert_called_once_with(
-        manager.session, manager.config, lazy_load_file_mock.return_value
-    )
+    file_mock.assert_called_once_with(mock_path, mock_chunk_size)
     assert manager.files == [file_mock.return_value]
-    manager.send_signal.assert_called_once_with(ResumableSignal.FILE_ADDED)
-    file_mock.return_value.proxy_signals_to.assert_called_once_with(manager)
+    executor_mock.return_value.submit.assert_has_calls([
+        call(_resolve_chunk, session_mock.return_value, manager.config,
+             file_mock.return_value, 'foo'),
+        call(_resolve_chunk, session_mock.return_value, manager.config,
+             file_mock.return_value, 'bar')
+    ])
 
 
-def test_wait_until_complete(session_mock, worker_pool_mock):
+def test_context_manager(session_mock, executor_mock):
+
     manager = Resumable(MOCK_TARGET)
-    manager.wait_until_complete()
-    worker_pool_mock.return_value.join.assert_called_once()
-
-
-def test_close(session_mock, worker_pool_mock):
-    manager = Resumable(MOCK_TARGET)
-    manager.files = [Mock(), Mock(), Mock()]
-    manager.close()
-
-    # TODO: should also ensure worker pool is closed
-    for mock_file in manager.files:
-        mock_file.close.assert_called_once()
-
-
-def test_context_manager(session_mock, worker_pool_mock):
-    manager = Resumable(MOCK_TARGET)
-    manager.wait_until_complete = Mock()
-    manager.close = Mock()
+    manager.files = [Mock(), Mock()]
 
     with manager as entered_manager:
-        assert manager == entered_manager
+        assert entered_manager is manager
 
-    manager.wait_until_complete.assert_called_once()
-    manager.close.assert_called_once()
+    # TODO: Check that futures are stopped
 
+    for file in manager.files:
+        file.close.assert_called_once()
 
-def test_chunks(session_mock, worker_pool_mock):
-    manager = Resumable(MOCK_TARGET)
-    manager.files = [
-        Mock(chunks=range(4)),
-        Mock(chunks=range(4, 6)),
-        Mock(chunks=range(6, 10))
-    ]
-    assert list(manager.chunks) == list(range(10))
-
-
-def test_next_task(mocker, session_mock, worker_pool_mock):
-    mock_chunks = [
-        Mock(status=ResumableChunkState.SUCCESS),
-        Mock(status=ResumableChunkState.POPPED),
-        Mock(status=ResumableChunkState.UPLOADING),
-        Mock(status=ResumableChunkState.PENDING),
-        Mock(status=ResumableChunkState.PENDING)
-    ]
-    mocker.patch.object(Resumable, 'chunks', mock_chunks)
-    manager = Resumable(MOCK_TARGET)
-    assert manager.next_task() == mock_chunks[3].create_task.return_value
+    executor_mock.return_value.shutdown.assert_called_once()
