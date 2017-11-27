@@ -51,9 +51,7 @@ def test_resolve_chunk(test_status):
 
     session = mock_session()
     config = Config(
-        target=TEST_TARGET,
-        test_chunks=True,
-        permanent_errors=[500]
+        target=TEST_TARGET, test_chunks=True, permanent_errors=[500]
     )
     file = mock_file()
     chunk = FileChunk(index=0, size=100, read=Mock())
@@ -76,9 +74,7 @@ def test_resolve_chunk_exists():
 
     session = mock_session(test_status=200)
     config = Config(
-        target=TEST_TARGET,
-        test_chunks=True,
-        permanent_errors=[500]
+        target=TEST_TARGET, test_chunks=True, permanent_errors=[500]
     )
     file = mock_file()
     chunk = FileChunk(index=0, size=100, read=Mock())
@@ -97,9 +93,7 @@ def test_resolve_chunk_no_test():
 
     session = mock_session()
     config = Config(
-        target=TEST_TARGET,
-        test_chunks=False,
-        permanent_errors=[500]
+        target=TEST_TARGET, test_chunks=False, permanent_errors=[500]
     )
     file = mock_file()
     chunk = FileChunk(index=0, size=100, read=Mock())
@@ -119,9 +113,7 @@ def test_resolve_chunk_send_permanent_error():
 
     session = mock_session(send_status=500)
     config = Config(
-        target=TEST_TARGET,
-        test_chunks=True,
-        permanent_errors=[500]
+        target=TEST_TARGET, test_chunks=True, permanent_errors=[500]
     )
     file = mock_file()
     chunk = FileChunk(index=0, size=100, read=Mock())
@@ -145,9 +137,7 @@ def test_resolve_chunk_send_exceed_max_retries():
 
     session = mock_session(send_status=418)
     config = Config(
-        target=TEST_TARGET,
-        test_chunks=True,
-        permanent_errors=[500],
+        target=TEST_TARGET, test_chunks=True, permanent_errors=[500],
         max_chunk_retries=10
     )
     file = mock_file()
