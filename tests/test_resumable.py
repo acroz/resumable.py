@@ -50,24 +50,25 @@ def test_resumable(session_mock, executor_mock):
     executor_mock.assert_called_once_with(mock_sim_uploads)
 
 
-def test_add_file(mocker, session_mock, executor_mock):
+def test_add_file(mocker, session_mock):
 
-    file_mock = mocker.patch('resumable.core.ResumableFile',
-                             return_value=Mock(chunks=['foo', 'bar']))
+    file = Mock(chunks=['foo', 'bar'])
+    file_mock = mocker.patch('resumable.core.ResumableFile', return_value=file)
+    resolve_chunk_mock = mocker.patch('resumable.core.resolve_chunk')
 
     mock_path = '/mock/path'
     mock_chunk_size = 100
 
     manager = Resumable(MOCK_TARGET, chunk_size=mock_chunk_size)
     manager.add_file(mock_path)
+    manager.join()
 
     file_mock.assert_called_once_with(mock_path, mock_chunk_size)
-    assert manager.files == [file_mock.return_value]
-    executor_mock.return_value.submit.assert_has_calls([
-        call(resolve_chunk, session_mock.return_value, manager.config,
-             file_mock.return_value, 'foo'),
-        call(resolve_chunk, session_mock.return_value, manager.config,
-             file_mock.return_value, 'bar')
+    assert manager.files == [file]
+
+    resolve_chunk_mock.assert_has_calls([
+        call(session_mock.return_value, manager.config, file, 'foo'),
+        call(session_mock.return_value, manager.config, file, 'bar')
     ])
 
 
