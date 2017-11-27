@@ -1,3 +1,5 @@
+import time
+
 from mock import Mock, call
 import pytest
 
@@ -70,6 +72,37 @@ def test_add_file(mocker, session_mock):
         call(session_mock.return_value, manager.config, file, 'foo'),
         call(session_mock.return_value, manager.config, file, 'bar')
     ])
+
+
+def test_add_file_failure(mocker, session_mock):
+
+    class IntentionalException(Exception):
+        pass
+
+    file = Mock(chunks=['one', 'two', 'three', 'four'])
+    mocker.patch('resumable.core.ResumableFile', return_value=file)
+
+    def mock_resolve_chunk(session, config, file, chunk):
+        if chunk == 'one':
+            return
+        elif chunk == 'two':
+            raise IntentionalException()
+        else:
+            time.sleep(0.25)
+
+    mocker.patch('resumable.core.resolve_chunk', mock_resolve_chunk)
+
+    manager = Resumable(MOCK_TARGET, chunk_size=100, simultaneous_uploads=1)
+    manager.add_file('/mock/path')
+
+    join_start = time.time()
+    with pytest.raises(IntentionalException):
+        manager.join()
+    join_duration = time.time() - join_start
+
+    # Check that we do not wait for all underlying tasks to be completed - they
+    # should be cancelled when the exception is retrieved
+    assert join_duration < 0.3
 
 
 def test_context_manager():
