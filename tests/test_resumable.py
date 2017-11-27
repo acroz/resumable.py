@@ -1,7 +1,7 @@
 from mock import Mock, call
 import pytest
 
-from resumable.core import Resumable, resolve_chunk
+from resumable.core import Resumable
 from resumable.util import Config
 
 
