@@ -23,9 +23,9 @@ def mock_session(test_status=404, send_status=200):
     return session
 
 
-def mock_file():
+def mock_file(path=TEST_PATH):
     return Mock(
-        path=TEST_PATH,
+        path=path,
         size=TEST_FILE_SIZE,
         chunk_size=TEST_CHUNK_SIZE,
         unique_identifier='unique identifier',
@@ -39,47 +39,53 @@ def mock_chunk():
     )
 
 
-def expected_form_data():
+def expected_form_data(path=TEST_PATH, file_type='text/plain'):
     return {
         'resumableChunkSize': TEST_CHUNK_SIZE,
         'resumableTotalSize': TEST_FILE_SIZE,
-        'resumableType': 'text/plain',
+        'resumableType': file_type,
         'resumableIdentifier': 'unique identifier',
-        'resumableFilename': TEST_PATH.split('/')[-1],
-        'resumableRelativePath': TEST_PATH,
+        'resumableFilename': path.split('/')[-1],
+        'resumableRelativePath': path,
         'resumableTotalChunks': 2,
         'resumableChunkNumber': 1,
         'resumableCurrentChunkSize': 100
     }
 
 
-def assert_get(session):
+def assert_get(session, **kwargs):
     session.get.assert_called_once_with(
-        TEST_TARGET, data=expected_form_data()
+        TEST_TARGET, data=expected_form_data(**kwargs)
     )
 
 
-def assert_post(session, times=1):
+def assert_post(session, times=1, **kwargs):
     single_call = call(
-        TEST_TARGET, data=expected_form_data(), files={'file': MOCK_CHUNK_DATA}
+        TEST_TARGET, data=expected_form_data(**kwargs),
+        files={'file': MOCK_CHUNK_DATA}
     )
     session.post.assert_has_calls([single_call] * times)
 
 
-@pytest.mark.parametrize('test_status', [404, 500])
-def test_resolve_chunk(test_status):
+@pytest.mark.parametrize('path, file_type, test_status', [
+    (TEST_PATH, 'text/plain', 404),
+    (TEST_PATH, 'text/plain', 500),
+    ('/path/to/file.json', 'application/json', 404),
+    ('/path/no-extension', '', 404)
+])
+def test_resolve_chunk(path, file_type, test_status):
 
     session = mock_session()
     config = Config(
         target=TEST_TARGET, test_chunks=True, permanent_errors=[500]
     )
-    file = mock_file()
+    file = mock_file(path)
     chunk = mock_chunk()
 
     resolve_chunk(session, config, file, chunk)
 
-    assert_get(session)
-    assert_post(session)
+    assert_get(session, path=path, file_type=file_type)
+    assert_post(session, path=path, file_type=file_type)
     file.mark_chunk_completed.assert_called_once_with(chunk)
 
 
