@@ -72,6 +72,29 @@ def test_close(sample_file, mock_open):  # noqa: F811
     mock_open.return_value.close.assert_called_once()
 
 
+def test_mark_chunk_completed(mocker, sample_file):  # noqa: F811
+
+    chunk = Mock()
+    mocker.patch('resumable.file.build_chunks', return_value=[chunk])
+
+    file = ResumableFile(sample_file, TEST_CHUNK_SIZE)
+    file.mark_chunk_completed(chunk)
+
+    assert file._chunk_done == {chunk: True}
+
+
+def test_is_completed(sample_file):  # noqa: F811
+    file = ResumableFile(sample_file, TEST_CHUNK_SIZE)
+    file._chunk_done = {'one': True, 'two': True}
+    assert file.is_completed is True
+
+
+def test_not_completed(sample_file):  # noqa: F811
+    file = ResumableFile(sample_file, TEST_CHUNK_SIZE)
+    file._chunk_done = {'one': True, 'two': False}
+    assert file.is_completed is False
+
+
 def test_read_bytes(sample_file):  # noqa: F811
     file = ResumableFile(sample_file, TEST_CHUNK_SIZE)
     assert file._read_bytes(2, 10) == SAMPLE_CONTENT[2:12]
