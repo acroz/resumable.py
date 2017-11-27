@@ -2,6 +2,10 @@ import os
 import mimetypes
 
 
+class ResumableError(Exception):
+    pass
+
+
 def resolve_chunk(session, config, file, chunk):
 
     exists_on_server = False
@@ -13,7 +17,7 @@ def resolve_chunk(session, config, file, chunk):
         while not _send_chunk(session, config, file, chunk):
             tries += 1
             if tries >= config.max_chunk_retries:
-                raise RuntimeError('max retries exceeded')
+                raise ResumableError('max retries exceeded')
 
     file.mark_chunk_completed(chunk)
 
@@ -34,7 +38,7 @@ def _send_chunk(session, config, file, chunk):
     )
     if response.status_code in config.permanent_errors:
         # TODO: better exception
-        raise RuntimeError('permanent error')
+        raise ResumableError('permanent error')
     return response.status_code in [200, 201]
 
 
