@@ -56,7 +56,7 @@ class Resumable(object):
 
         return file
 
-    def join(self):
+    def _wait(self):
         """Wait until all current uploads are completed."""
         for future in as_completed(self.futures):
             if future.exception():
@@ -67,12 +67,9 @@ class Resumable(object):
             if not future.done():
                 future.cancel()
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
+    def join(self):
         try:
-            self.join()
+            self._wait()
         except:  # noqa: E722
             self._cancel_remaining_futures()
             raise
@@ -80,3 +77,9 @@ class Resumable(object):
             self.executor.shutdown()
             for file in self.files:
                 file.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        self.join()

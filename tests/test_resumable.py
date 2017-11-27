@@ -72,17 +72,12 @@ def test_add_file(mocker, session_mock):
     ])
 
 
-def test_context_manager(session_mock, executor_mock):
+def test_context_manager():
 
     manager = Resumable(MOCK_TARGET)
-    manager.files = [Mock(), Mock()]
+    manager.join = Mock()
 
     with manager as entered_manager:
         assert entered_manager is manager
 
-    # TODO: Check that futures are stopped
-
-    for file in manager.files:
-        file.close.assert_called_once()
-
-    executor_mock.return_value.shutdown.assert_called_once()
+    manager.join.assert_called_once()
