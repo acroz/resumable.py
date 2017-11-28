@@ -37,7 +37,7 @@ class ResumableFile(object):
         self.path = str(path)
         self.unique_identifier = uuid.uuid4()
         self.chunk_size = int(chunk_size)
-        self.size = os.path.getsize(path)
+        self.size = os.path.getsize(self.path)
 
         self._fp = open(path, 'rb')
         self._fp_lock = Lock()
