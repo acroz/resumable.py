@@ -32,6 +32,13 @@ class Resumable(object):
         Flag indicating if the client should check with the server if a chunk
         already exists with a GET request prior to attempting to upload the
         chunk with a POST
+
+    Attributes
+    ----------
+    file_added : resumable.util.CallbackDispatcher
+        Triggered when a file has been added, passing the file object
+    file_completed : resumable.util.CallbackDispatcher
+        Triggered when a file upload has completed, passing the file object
     """
 
     def __init__(self, target, simultaneous_uploads=3, chunk_size=MiB,
