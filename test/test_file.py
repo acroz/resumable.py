@@ -3,7 +3,7 @@ from mock import Mock, MagicMock, call
 import pytest
 
 from resumable.file import ResumableFile, build_chunks
-from tests.fixture import (  # noqa: F401
+from test.fixture import (  # noqa: F401
     SAMPLE_CONTENT, TEST_CHUNK_SIZE, SAMPLE_CONTENT_CHUNKS, sample_file
 )
 

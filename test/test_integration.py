@@ -1,6 +1,6 @@
 from resumable import Resumable
 
-from tests.fixture import (  # noqa: F401
+from test.fixture import (  # noqa: F401
     SAMPLE_CONTENT, TEST_CHUNK_SIZE, SAMPLE_CONTENT_CHUNKS, sample_file,
     server, Request
 )
