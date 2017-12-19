@@ -45,8 +45,6 @@ class Resumable(object):
                  headers=None, max_chunk_retries=100,
                  permanent_errors=(400, 404, 415, 500, 501), test_chunks=True):
 
-        super(Resumable, self).__init__()
-
         self.config = Config(
             target=target,
             headers=headers,
