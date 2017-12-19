@@ -32,9 +32,13 @@ def expected_requests(resumable_file, testfile):
 
 
 def test_resumable(server, sample_file):  # noqa: F811
-    with Resumable(simultaneous_uploads=1,
-                   target=server.endpoint,
-                   chunk_size=TEST_CHUNK_SIZE) as r:
+
+    with Resumable(
+        target=server.endpoint,
+        chunk_size=TEST_CHUNK_SIZE,
+        simultaneous_uploads=1
+    ) as r:
         resumable_file = r.add_file(sample_file)
+
     expected = expected_requests(resumable_file, sample_file)
     assert sorted(server.received) == sorted(expected)
