@@ -7,14 +7,37 @@ from resumable.chunk import resolve_chunk
 from resumable.util import CallbackDispatcher, Config
 
 
-MB = 1024 * 1024
+MiB = 1024 * 1024
 
 
 class Resumable(object):
+    """A resumable.py upload client.
 
-    def __init__(self, target, simultaneous_uploads=3, chunk_size=MB,
+    Parameters
+    ----------
+    target : str
+        The URL of the resumable upload target
+    simultaneous_uploads : int, optional
+        The number of file chunk uploads to attempt at once
+    chunk_size : int, optional
+        The size, in bytes, of file chunks to be uploaded
+    headers : dict, optional
+        A dictionary of additional HTTP headers to include in requests
+    max_chunk_retries : int, optional
+        The number of times to retry uploading a chunk
+    permanent_errors : collection of int, optional
+        HTTP status codes that indicate the upload of a chunk has failed and
+        should not be retried
+    test_chunks : bool
+        Flag indicating if the client should check with the server if a chunk
+        already exists with a GET request prior to attempting to upload the
+        chunk with a POST
+    """
+
+    def __init__(self, target, simultaneous_uploads=3, chunk_size=MiB,
                  headers=None, max_chunk_retries=100,
-                 permanent_errors=[400, 404, 415, 500, 501], test_chunks=True):
+                 permanent_errors=(400, 404, 415, 500, 501), test_chunks=True):
+
         super(Resumable, self).__init__()
 
         self.config = Config(
@@ -42,6 +65,18 @@ class Resumable(object):
         self.file_completed = CallbackDispatcher()
 
     def add_file(self, path):
+        """Add a file to be uploaded.
+
+        Parameters
+        ----------
+        path : str
+            The file of the path to be uploaded
+
+        Returns
+        -------
+        resumable.file.ResumableFile
+        """
+
         file = ResumableFile(path, self.config.chunk_size)
         self.files.append(file)
 
@@ -68,6 +103,7 @@ class Resumable(object):
                 future.cancel()
 
     def join(self):
+        """Block until all uploads are complete, or an error occurs."""
         try:
             self._wait()
         except:  # noqa: E722
