@@ -39,7 +39,7 @@ class ResumableFile(object):
         self.chunk_size = int(chunk_size)
         self.size = os.path.getsize(self.path)
 
-        self._fp = open(path, 'rb')
+        self._fp = open(self.path, 'rb')
         self._fp_lock = Lock()
 
         self.chunks = build_chunks(self._read_bytes, self.size, chunk_size)
