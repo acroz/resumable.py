@@ -1,1 +1,1 @@
-from resumable.core import Resumable, ResumableSignal  # noqa
+from resumable.core import Resumable  # noqa

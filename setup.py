@@ -19,13 +19,13 @@ setup(
     tests_require=[
         'pytest',
         'pytest-cov',
-        'six',
         'mock',
         'pytest-mock',
+        'six',
         'flask'
     ],
     install_requires=[
-        'enum34',
-        'requests'
+        'requests',
+        'futures'
     ]
 )
