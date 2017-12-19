@@ -29,9 +29,15 @@ def test_resumable(session_mock, executor_mock):
     mock_permanent_errors = [500]
     mock_test_chunks = True
 
-    manager = Resumable(MOCK_TARGET, mock_sim_uploads, mock_chunk_size,
-                        mock_headers, mock_max_chunk_retries,
-                        mock_permanent_errors, mock_test_chunks)
+    manager = Resumable(
+        MOCK_TARGET,
+        mock_chunk_size,
+        mock_sim_uploads,
+        mock_headers,
+        mock_test_chunks,
+        mock_max_chunk_retries,
+        mock_permanent_errors
+    )
 
     assert manager.config == Config(
         target=MOCK_TARGET,

@@ -1,17 +1,30 @@
 class CallbackDispatcher(object):
+    """Dispatch callbacks to registered targets."""
 
     def __init__(self):
         self.targets = []
 
     def register(self, callback):
+        """Register a callback.
+
+        Parameters
+        ----------
+        callback : callable
+            A callback to call when the dispatcher is triggered.
+        """
         self.targets.append(callback)
 
     def trigger(self, *args, **kwargs):
+        """Trigger this dispatcher.
+
+        All arguments are passed through to the registered callbacks.
+        """
         for callback in self.targets:
             callback(*args, **kwargs)
 
 
 class Config(object):
+    """The configuration for a resumable session."""
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():

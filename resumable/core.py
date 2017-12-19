@@ -7,24 +7,53 @@ from resumable.chunk import resolve_chunk
 from resumable.util import CallbackDispatcher, Config
 
 
-MB = 1024 * 1024
+MiB = 1024 * 1024
 
 
 class Resumable(object):
+    """A resumable.py upload client.
 
-    def __init__(self, target, simultaneous_uploads=3, chunk_size=MB,
-                 headers=None, max_chunk_retries=100,
-                 permanent_errors=[400, 404, 415, 500, 501], test_chunks=True):
-        super(Resumable, self).__init__()
+    Parameters
+    ----------
+    target : str
+        The URL of the resumable upload target
+    chunk_size : int, optional
+        The size, in bytes, of file chunks to be uploaded
+    simultaneous_uploads : int, optional
+        The number of file chunk uploads to attempt at once
+    headers : dict, optional
+        A dictionary of additional HTTP headers to include in requests
+    test_chunks : bool
+        Flag indicating if the client should check with the server if a chunk
+        already exists with a GET request prior to attempting to upload the
+        chunk with a POST
+    max_chunk_retries : int, optional
+        The number of times to retry uploading a chunk
+    permanent_errors : collection of int, optional
+        HTTP status codes that indicate the upload of a chunk has failed and
+        should not be retried
+
+    Attributes
+    ----------
+    file_added : resumable.util.CallbackDispatcher
+        Triggered when a file has been added, passing the file object
+    file_completed : resumable.util.CallbackDispatcher
+        Triggered when a file upload has completed, passing the file object
+    """
+
+    def __init__(self, target, chunk_size=MiB, simultaneous_uploads=3,
+                 headers=None, test_chunks=True,
+                 max_chunk_retries=100,
+                 permanent_errors=(400, 404, 415, 500, 501)):
 
         self.config = Config(
             target=target,
-            headers=headers,
-            simultaneous_uploads=simultaneous_uploads,
             chunk_size=chunk_size,
+            simultaneous_uploads=simultaneous_uploads,
+            headers=headers,
+            test_chunks=test_chunks,
             max_chunk_retries=max_chunk_retries,
-            permanent_errors=permanent_errors,
-            test_chunks=test_chunks
+            permanent_errors=permanent_errors
         )
 
         self.session = requests.Session()
@@ -42,6 +71,18 @@ class Resumable(object):
         self.file_completed = CallbackDispatcher()
 
     def add_file(self, path):
+        """Add a file to be uploaded.
+
+        Parameters
+        ----------
+        path : str
+            The file of the path to be uploaded
+
+        Returns
+        -------
+        resumable.file.ResumableFile
+        """
+
         file = ResumableFile(path, self.config.chunk_size)
         self.files.append(file)
 
@@ -68,6 +109,7 @@ class Resumable(object):
                 future.cancel()
 
     def join(self):
+        """Block until all uploads are complete, or an error occurs."""
         try:
             self._wait()
         except:  # noqa: E722

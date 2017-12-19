@@ -11,6 +11,21 @@ FileChunk = namedtuple('FileChunk', ['index', 'size', 'read'])
 
 
 def build_chunks(read_bytes, file_size, chunk_size):
+    """Build a sequence of chunks from a file.
+
+    Parameters
+    ----------
+    read_bytes : callable
+        A callable returning the data for a byte range of a file
+    file_size : int
+        The total size of the file, in bytes
+    chunk_size : int
+        The size of the generated chunks, in bytes
+
+    Returns
+    -------
+    list of resumable.file.FileChunk
+    """
 
     chunks = []
 
@@ -31,6 +46,20 @@ def build_chunks(read_bytes, file_size, chunk_size):
 
 
 class ResumableFile(object):
+    """A file to be uploaded in a resumable session.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path
+        The path of the file
+    chunk_size : int
+        The size, in bytes, of chunks uploaded in a single request
+
+    Attributes
+    ----------
+    completed : resumable.util.CallbackDispatcher
+        Triggered when all chunks of the file have been uploaded
+    """
 
     def __init__(self, path, chunk_size):
 
@@ -48,18 +77,31 @@ class ResumableFile(object):
         self.completed = CallbackDispatcher()
 
     def close(self):
+        """Close the file."""
         self._fp.close()
 
     def _read_bytes(self, start, num_bytes):
+        """Read a byte range from the file."""
         with self._fp_lock:
             self._fp.seek(start)
             return self._fp.read(num_bytes)
 
     @property
     def is_completed(self):
+        """Indicates if all chunks of this file have been uploaded."""
         return all(self._chunk_done.values())
 
     def mark_chunk_completed(self, chunk):
+        """Mark a chunk of this file as having been successfully uploaded.
+
+        If all chunks have been completed, this will trigger the `completed`
+        callback of this file.
+
+        Parameters
+        ----------
+        chunk : resumable.chunk.FileChunk
+            The chunk to mark as completed
+        """
         self._chunk_done[chunk] = True
         if self.is_completed:
             self.completed.trigger()
