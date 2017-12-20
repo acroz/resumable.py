@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import partial
 
 import requests
 
@@ -39,6 +40,9 @@ class Resumable(object):
         Triggered when a file has been added, passing the file object
     file_completed : resumable.util.CallbackDispatcher
         Triggered when a file upload has completed, passing the file object
+    chunk_completed : resumable.util.CallbackDispatcher
+        Triggered when a chunk upload has completed, passing the file and chunk
+        objects
     """
 
     def __init__(self, target, chunk_size=MiB, simultaneous_uploads=3,
@@ -69,6 +73,7 @@ class Resumable(object):
 
         self.file_added = CallbackDispatcher()
         self.file_completed = CallbackDispatcher()
+        self.chunk_completed = CallbackDispatcher()
 
     def add_file(self, path):
         """Add a file to be uploaded.
@@ -87,7 +92,10 @@ class Resumable(object):
         self.files.append(file)
 
         self.file_added.trigger(file)
-        file.completed.register(lambda: self.file_completed.trigger(file))
+        file.completed.register(partial(self.file_completed.trigger, file))
+        file.chunk_completed.register(
+            partial(self.chunk_completed.trigger, file)
+        )
 
         for chunk in file.chunks:
             future = self.executor.submit(

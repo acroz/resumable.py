@@ -51,6 +51,40 @@ resumable.py supports a subset of the options provided by [resumable.js]:
 Some additional low level options are available - these are documented in the
 docstring of the `Resumable` class.
 
+### Callbacks and Progress Reporting
+
+resumable.py provides the ability to register arbitrary functions as callbacks
+in response to certain events. These are:
+
+On the `Resumable` object:
+
+* `file_added` Triggered when a file is added, with the file object
+* `file_completed` Triggered when a file is completed, with the file object
+* `chunk_completed` Triggered when a chunk is completed, with the file and
+  chunk objects
+
+On a `ResumableFile` (returned by `Resumable.add_file()`):
+
+* `completed` Triggered when the file is completed, without arguments
+* `chunk_completed` Triggered when a chunk is completed, with the chunk object
+
+Each of these callback dispatchers has a `register()` method that you can use
+to register callbacks. For example, to print a simple progress message that
+updates as chunks are uploaded:
+
+```python
+with Resumable('https://example.com/upload') as session:
+    file = session.add_file('my_file.dat')
+
+    def print_progress(chunk):
+        template = '\rPercent complete: {:.1%}'
+        print(template.format(file.fraction_completed), end='')
+
+    file.chunk_completed.register(print_progress)
+
+print()  # new line
+```
+
 ## Contribute
 
 resumable.py's design is informed by [resumable.js], however only a core subset
