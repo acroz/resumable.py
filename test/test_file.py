@@ -85,14 +85,20 @@ def test_mark_chunk_completed(mocker, sample_file):  # noqa: F811
 
 def test_is_completed(sample_file):  # noqa: F811
     file = ResumableFile(sample_file, TEST_CHUNK_SIZE)
-    file._chunk_done = {'one': True, 'two': True}
+    file._chunk_done = {'one': True, 'two': True, 'three': True}
     assert file.is_completed is True
 
 
 def test_not_completed(sample_file):  # noqa: F811
     file = ResumableFile(sample_file, TEST_CHUNK_SIZE)
-    file._chunk_done = {'one': True, 'two': False}
+    file._chunk_done = {'one': True, 'two': False, 'three': False}
     assert file.is_completed is False
+
+
+def test_fraction_completed(sample_file):  # noqa: F811
+    file = ResumableFile(sample_file, TEST_CHUNK_SIZE)
+    file._chunk_done = {'one': True, 'two': False, 'three': False}
+    assert file.fraction_completed == 1. / 3
 
 
 def test_read_bytes(sample_file):  # noqa: F811

@@ -1,3 +1,5 @@
+from __future__ import division
+
 import os
 import uuid
 from threading import Lock
@@ -90,6 +92,11 @@ class ResumableFile(object):
     def is_completed(self):
         """Indicates if all chunks of this file have been uploaded."""
         return all(self._chunk_done.values())
+
+    @property
+    def fraction_completed(self):
+        """The fraction of the file that has been completed."""
+        return sum(self._chunk_done.values()) / len(self.chunks)
 
     def mark_chunk_completed(self, chunk):
         """Mark a chunk of this file as having been successfully uploaded.
