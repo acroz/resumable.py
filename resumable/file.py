@@ -61,6 +61,9 @@ class ResumableFile(object):
     ----------
     completed : resumable.util.CallbackDispatcher
         Triggered when all chunks of the file have been uploaded
+    chunk_completed : resumable.util.CallbackDispatcher
+        Triggered when a chunks of the file has been uploaded, passing the
+        chunk
     """
 
     def __init__(self, path, chunk_size):
@@ -77,6 +80,7 @@ class ResumableFile(object):
         self._chunk_done = {chunk: False for chunk in self.chunks}
 
         self.completed = CallbackDispatcher()
+        self.chunk_completed = CallbackDispatcher()
 
     def close(self):
         """Close the file."""
@@ -113,3 +117,4 @@ class ResumableFile(object):
         if self.is_completed:
             self.completed.trigger()
             self.close()
+        self.chunk_completed.trigger(chunk)
