@@ -3,6 +3,7 @@ from functools import partial
 
 import requests
 
+from resumable.version import user_agent
 from resumable.file import ResumableFile
 from resumable.chunk import resolve_chunk
 from resumable.util import CallbackDispatcher, Config
@@ -61,8 +62,7 @@ class Resumable(object):
         )
 
         self.session = requests.Session()
-
-        # TODO: Set User-Agent as python-resumable/version
+        self.session.headers['User-Agent'] = user_agent()
         if headers:
             self.session.headers.update(headers)
 
