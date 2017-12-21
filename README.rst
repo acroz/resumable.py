@@ -9,6 +9,15 @@ resumable.py
 resumable.py provides chunked uploading of files to a compatible server,
 emulating the popular resumable.js_ JavaScript library.
 
+Installation
+------------
+
+resumable.py can be installed from PyPI with ``pip``:
+
+.. code-block:: bash
+
+    $ pip install resumable
+
 Usage
 -----
 
