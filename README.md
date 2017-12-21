@@ -33,6 +33,14 @@ do_something_else()
 session.join()
 ```
 
+### Backend
+
+resumable.py handles most of the logic needed for resumable file uploads on the
+client side, but the files still need to be reassembled from chunks on the
+server side, as in [resumable.js]. For details on how to set up a compatible
+backend, please see the [resumable.js] documentation or the backend samples
+[on GitHub][resumable.js samples].
+
 ### Configuration
 
 resumable.py supports a subset of the options provided by [resumable.js]:
@@ -95,3 +103,4 @@ equivalents as appropriate (for example, the `simultaneousUploads`
 configuration parameter becomes `simultaneous_uploads` in Python).
 
 [resumable.js]: http://resumablejs.com
+[resumable.js samples]: https://github.com/23/resumable.js/tree/master/samples
