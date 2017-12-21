@@ -14,7 +14,9 @@ Usage
 
 Construct a ``Resumable`` object with the URL of the upload target server, and
 use ``add_file()`` to queue files for upload. It's recommended to use it as a
-context manager::
+context manager:
+
+.. code-block:: python
 
     from resumable import Resumable
 
@@ -26,7 +28,9 @@ block will not complete until the upload is finished (or an exception is
 raised).
 
 It's also possible to use a ``Resumable`` session without a ``with`` block, and
-manually ``join()`` the session::
+manually ``join()`` the session:
+
+.. code-block:: python
 
     session = Resumable('https://example.com/upload')
     session.add_file('my_file.dat')
@@ -82,7 +86,9 @@ On a ``ResumableFile`` (returned by ``Resumable.add_file()``):
 
 Each of these callback dispatchers has a ``register()`` method that you can use
 to register callbacks. For example, to print a simple progress message that
-updates as chunks are uploaded::
+updates as chunks are uploaded:
+
+.. code-block:: python
 
     with Resumable('https://example.com/upload') as session:
         file = session.add_file('my_file.dat')
