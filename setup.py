@@ -5,7 +5,7 @@ setup(
     name='resumable',
     version='0.0.0-dev0',
     description='Chunked upload to a server supporting resumable.js',
-    url='https://acroz.github.io',
+    url='https://acroz.github.com/acroz/resumable.py',
     author='Andrew Crozier',
     author_email='wacrozier@gmail.com',
     license='MIT',
