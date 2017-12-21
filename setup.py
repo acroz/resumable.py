@@ -26,6 +26,6 @@ setup(
     ],
     install_requires=[
         'requests',
-        'futures'
+        'futures; python_version == "2.7"'
     ]
 )
