@@ -15,7 +15,10 @@ setup(
         'Programming Language :: Python :: 3',
     ],
     packages=['resumable'],
-    setup_requires=['pytest-runner'],
+    setup_requires=[
+        'pytest-runner',
+        'wheel'
+    ],
     tests_require=[
         'pytest',
         'pytest-cov',
