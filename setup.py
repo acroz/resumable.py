@@ -28,7 +28,7 @@ setup(
     version=read_version(),
     description='Python client for upload to a server supporting resumable.js',
     long_description=read_long_description(),
-    url='https://acroz.github.com/acroz/resumable.py',
+    url='https://github.com/acroz/resumable.py',
     author='Andrew Crozier',
     author_email='wacrozier@gmail.com',
     license='MIT',
