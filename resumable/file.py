@@ -115,6 +115,6 @@ class ResumableFile(object):
         """
         self._chunk_done[chunk] = True
         if self.is_completed:
-            self.completed.trigger()
+            self.completed.trigger(self)
             self.close()
         self.chunk_completed.trigger(chunk)
